@@ -1,0 +1,1 @@
+ALTER TABLE sessions MODIFY token CHAR(64) NOT NULL;

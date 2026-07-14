@@ -1,0 +1,10 @@
+services:
+  pimepunkt-app:
+    networks:
+      - pimepunkt_local
+
+networks:
+  kanna_default:
+    external: false
+  pimepunkt_local:
+    driver: bridge

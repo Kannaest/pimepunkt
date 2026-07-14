@@ -1,0 +1,19 @@
+services:
+  pimepunkt-app:
+    build: .
+    container_name: pimepunkt-app
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8088:80"
+    env_file:
+      - .env
+    command: sh -lc "chown -R www-data:www-data /var/www/html/storage && chmod -R a+rwX /var/www/html/storage && apache2-foreground"
+    volumes:
+      - ./storage/uploads:/var/www/html/storage/uploads
+      - ./storage/mail:/var/www/html/storage/mail
+    networks:
+      - kanna_default
+
+networks:
+  kanna_default:
+    external: true
