@@ -18,13 +18,14 @@ docker compose run --rm pimepunkt-app php bin/migrate.php
 docker compose up -d --build
 ```
 
-The container listens on `127.0.0.1:8088`. On kand.ee, Apache should proxy `/pimepunkt` to that port.
+The container listens on `127.0.0.1:8088`. On your server, configure Apache or another reverse proxy to proxy `/pimepunkt` to that port.
+
 Admin and player login use one-time magic links sent by e-mail. With `MAIL_MODE=log`, links are written to `storage/mail/magic-links.log`.
 See `docs/email-setup.md` for SMTP setup examples.
 
 ## Apache proxy sketch
 
-Run on kandee with sudo rights:
+Run on the server with sudo rights:
 
 ```sh
 cd /home/kanna/pimepunkt
