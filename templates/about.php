@@ -17,5 +17,6 @@
     <h2>Mis andmeid salvestatakse</h2>
     <p class="muted">Mängu läbiviimiseks salvestatakse tiimi nimi, e-mail, brauseri sessioonitoken, vastused, vastamise aeg, GPS koordinaadid, GPS täpsus ja mängu ajal saadetud asukohalogid.</p>
     <p class="muted">Asukohti kasutatakse mängu kontrolliks, live-vaateks korraldajale ja lõpus teekondade kuvamiseks, kui korraldaja tulemused avaldab.</p>
+    <p class="muted">Kui korraldaja kasutab kiiruspiirangute kontrolli, arvutatakse järjestikustest piisava täpsusega asukohtadest hinnanguline kiirus. Salvestatakse kasutatud piirang, tuvastatud ületuse aeg, suurim hinnanguline kiirus ja võimalik punktivähendus. Ebatäpne või ebarealistlik GPS-näit märgitakse müraks.</p>
   </div>
 </section>

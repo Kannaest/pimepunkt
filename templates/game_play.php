@@ -3,6 +3,19 @@
   <button class="tab-button" data-tab="questions">Küsimused</button>
 </section>
 
+<?php if ($game['duration_minutes']): ?>
+  <section class="game-clock <?= $team['paused_at'] ? 'paused' : '' ?>" data-game-clock data-deadline="<?= e($deadline ? $deadline->format(DateTimeInterface::ATOM) : '') ?>" data-paused="<?= $team['paused_at'] ? '1' : '0' ?>">
+    <div><small>Mänguaeg</small><b data-game-clock-value><?= $team['paused_at'] ? 'Pausil' : 'Arvutan...' ?></b></div>
+    <form method="post" action="<?= e(path($team['paused_at'] ? '/game/resume' : '/game/pause')) ?>" data-pause-form>
+      <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+      <input type="hidden" name="lat" data-pause-lat>
+      <input type="hidden" name="lng" data-pause-lng>
+      <button class="button" type="submit"><?= $team['paused_at'] ? 'Jätka' : 'Paus' ?></button>
+    </form>
+  </section>
+<?php endif; ?>
+<?php if ($timeExpired): ?><div class="notice warn">Mänguaeg on lõppenud. Vastuseid enam esitada ei saa.</div><?php endif; ?>
+
 <section id="tab-map" class="game-tab active">
   <div class="map-shell" data-map-shell>
     <button class="map-reset-button" type="button" data-map-reset>Reset</button>
@@ -12,6 +25,9 @@
       <div class="empty-map">Kaarti pole veel lisatud.</div>
     <?php endif; ?>
   </div>
+  <?php if ((int)($game['allow_gpx_export'] ?? 0) === 1): ?>
+    <a class="button map-export-button" href="<?= e(path('/games/' . $game['id'] . '/checkpoints.gpx')) ?>" download>Laadi punktid GPX-failina</a>
+  <?php endif; ?>
 </section>
 
 <section id="tab-questions" class="game-tab">
@@ -57,7 +73,7 @@
                 <label class="choice"><input type="radio" name="answer_option_id" value="<?= e((string)$option['id']) ?>" required><span><?= e($option['label']) ?></span></label>
               <?php endforeach; ?>
             <?php endif; ?>
-            <button class="button primary" data-answer-button disabled>Vasta</button>
+            <button class="button primary" data-answer-button disabled <?= ($team['paused_at'] || $timeExpired) ? 'data-game-blocked="1"' : '' ?>>Vasta</button>
           </div>
         </form>
       <?php endforeach; ?>

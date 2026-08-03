@@ -256,12 +256,12 @@ foreach ($events as $event) {
                 continue;
             }
             $gameId = (int)$game['id'];
-            $pdo->prepare("UPDATE games SET status = IF(status IN ('draft','registration_open','waiting_start'), 'waiting_start', status), auto_approve_teams = 1 WHERE id = ?")
+            $pdo->prepare("UPDATE games SET status = IF(status IN ('draft','registration_open','waiting_start'), 'waiting_start', status), auto_approve_teams = 1, allow_gpx_export = 1, duration_minutes = 360, speeding_penalty = 7 WHERE id = ?")
                 ->execute([$gameId]);
             $pdo->prepare('DELETE FROM checkpoints WHERE game_id = ?')->execute([$gameId]);
             $replaced++;
         } else {
-            $insert = $pdo->prepare('INSERT INTO games (name, status, default_visit_points, default_wrong_penalty, auto_approve_teams, created_by_admin_id, public_results_enabled) VALUES (?, ?, 3, 2, 1, ?, 1)');
+            $insert = $pdo->prepare('INSERT INTO games (name, status, default_visit_points, default_wrong_penalty, auto_approve_teams, created_by_admin_id, public_results_enabled, allow_gpx_export, duration_minutes, speeding_penalty) VALUES (?, ?, 3, 2, 1, ?, 1, 1, 360, 7)');
             $insert->execute([$event['event_name'], 'waiting_start', (int)$admin['id']]);
             $gameId = (int)$pdo->lastInsertId();
             $created++;

@@ -154,8 +154,10 @@
         qsa('[data-answer-lng]', row).forEach(function (el) { el.value = lng; });
         qsa('[data-answer-accuracy]', row).forEach(function (el) { el.value = accuracy; });
         var button = qs('[data-answer-button]', row);
-        if (button) button.disabled = d > parseFloat(row.dataset.radius);
+        if (button) button.disabled = button.dataset.gameBlocked === '1' || d > parseFloat(row.dataset.radius);
       });
+      qsa('[data-pause-lat]').forEach(function (el) { el.value = lat; });
+      qsa('[data-pause-lng]').forEach(function (el) { el.value = lng; });
       var list = qs('[data-question-list]');
       rows.sort(function (a, b) { return parseFloat(a.dataset.distance) - parseFloat(b.dataset.distance); })
         .forEach(function (row) { list.appendChild(row); });
@@ -224,7 +226,12 @@
     updateLocation();
     setInterval(updateLocation, 30000);
     if (navigator.geolocation) {
-      navigator.geolocation.watchPosition(function () { updateLocation(); }, function (error) {
+      var lastWatchUpdate = 0;
+      navigator.geolocation.watchPosition(function () {
+        if (Date.now() - lastWatchUpdate < 5000) return;
+        lastWatchUpdate = Date.now();
+        updateLocation();
+      }, function (error) {
         var warning = qs('[data-gps-warning]');
         if (warning) {
           warning.textContent = gpsErrorMessage(error);
@@ -232,6 +239,42 @@
         }
       }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 12000 });
     }
+  }
+
+  var pauseForm = qs('[data-pause-form]');
+  if (pauseForm) {
+    pauseForm.addEventListener('submit', function (event) {
+      var lat = qs('[data-pause-lat]', pauseForm);
+      var lng = qs('[data-pause-lng]', pauseForm);
+      if (!lat.value || !lng.value) {
+        event.preventDefault();
+        updateLocation();
+        var warning = qs('[data-gps-warning]');
+        if (warning) {
+          warning.textContent = 'Pausi või jätkamise kinnitamiseks oota, kuni GPS-asukoht on leitud, ja proovi uuesti.';
+          warning.hidden = false;
+        }
+      }
+    });
+  }
+
+  var gameClock = qs('[data-game-clock]');
+  if (gameClock) {
+    var clockValue = qs('[data-game-clock-value]', gameClock);
+    var renderClock = function () {
+      if (gameClock.dataset.paused === '1') {
+        clockValue.textContent = 'Pausil';
+        return;
+      }
+      var remaining = Math.max(0, Math.floor((new Date(gameClock.dataset.deadline).getTime() - Date.now()) / 1000));
+      var hours = Math.floor(remaining / 3600);
+      var minutes = Math.floor((remaining % 3600) / 60);
+      var seconds = remaining % 60;
+      clockValue.textContent = [hours, minutes, seconds].map(function (v) { return String(v).padStart(2, '0'); }).join(':');
+      gameClock.classList.toggle('expired', remaining === 0);
+    };
+    renderClock();
+    setInterval(renderClock, 1000);
   }
 
   function maaametLayer(layerName) {
@@ -398,7 +441,18 @@
     if (!el || !window.L || !window.PIMEPUNKT) return;
     var leaflet = L.map(el).setView([58.75, 25.0], 7);
     var liveLayer = L.layerGroup().addTo(leaflet);
+    var trafficLayer = L.layerGroup().addTo(leaflet);
     var didFit = false;
+    function popupContent(lines) {
+      var container = document.createElement('div');
+      lines.filter(Boolean).forEach(function (line, index) {
+        if (index) container.appendChild(document.createElement('br'));
+        var span = document.createElement(index === 0 ? 'b' : 'span');
+        span.textContent = String(line);
+        container.appendChild(span);
+      });
+      return container;
+    }
     maaametLayer().addTo(leaflet);
     function loadLiveLocations() {
       fetch(window.PIMEPUNKT.basePath + '/admin/locations/' + el.dataset.gameId)
@@ -425,6 +479,28 @@
     }
     loadLiveLocations();
     setInterval(loadLiveLocations, 5000);
+    fetch(window.PIMEPUNKT.basePath + '/games/' + el.dataset.gameId + '/traffic')
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        L.geoJSON(data.restrictions || { type: 'FeatureCollection', features: [] }, {
+          style: function (feature) {
+            return { color: feature.properties && feature.properties.effect === 'COMPLETE_CLOSURE' ? '#b3261e' : '#f08b32', weight: 5, dashArray: '8 5' };
+          },
+          onEachFeature: function (feature, layer) {
+            var p = feature.properties || {};
+            layer.bindPopup(popupContent([p.road_name || 'Teeinfo', p.effect, p.extra_info]));
+          }
+        }).addTo(trafficLayer);
+        (data.speed_zones || []).forEach(function (zone) {
+          var layer;
+          if (zone.geometry_type === 'circle') {
+            layer = L.circle([parseFloat(zone.center_lat), parseFloat(zone.center_lng)], { radius: parseInt(zone.radius_m, 10), color: '#3b7f57', fillOpacity: 0.08 });
+          } else {
+            layer = L.polyline(JSON.parse(zone.geometry_json || '[]'), { color: '#3b7f57', weight: 4, opacity: 0.7 });
+          }
+          layer.addTo(trafficLayer).bindPopup(popupContent([zone.name, zone.speed_limit_kmh + ' km/h']));
+        });
+      }).catch(function () {});
   }
 
   function initResultsMap() {

@@ -22,6 +22,23 @@
     <?php endforeach; ?>
   </div>
 </section>
+<?php if ($speedingEvents): ?>
+<section class="panel">
+  <h2>Kiiruseületused</h2>
+  <div class="list compact-list">
+    <?php foreach ($speedingEvents as $event): ?>
+      <div class="row">
+        <span><b><?= e($event['team_name']) ?></b> · <?= e((string)round((float)$event['max_speed_kmh'])) ?> / <?= e((string)$event['limit_kmh']) ?> km/h · <?= e((string)($event['zone_name'] ?? 'kiirusala')) ?></span>
+        <span><?= e($event['status']) ?><?= $event['penalty_points'] ? ' · -' . e((string)$event['penalty_points']) . ' p' : '' ?></span>
+        <form method="post" action="<?= e(path('/admin/speeding/' . $event['id'] . '/' . ($event['status'] === 'dismissed' ? 'confirm' : 'dismiss'))) ?>">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <button class="icon-button"><?= $event['status'] === 'dismissed' ? 'Kinnita' : 'Tühista' ?></button>
+        </form>
+      </div>
+    <?php endforeach; ?>
+  </div>
+</section>
+<?php endif; ?>
 <section class="panel">
   <h2>Asukohad ja liikumised</h2>
   <div class="leaflet-map live-map" data-admin-live-map data-game-id="<?= e((string)$game['id']) ?>"></div>

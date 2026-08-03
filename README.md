@@ -38,6 +38,26 @@ When the game visit-point default is 3, checkpoint difficulty uses these shapes 
 
 A checkpoint-specific visit score overrides the difficulty default. GPX imports can provide the level as `<extensions><difficulty>1</difficulty></extensions>`.
 
+## Maps, timing, and road data
+
+- Admin can generate a 1600x1000 player map from the Maa- ja Ruumiamet grayscale WMS. Compact games receive a closer view; larger games fit all checkpoints.
+- GPX export is disabled per game by default and can be enabled in game settings.
+- Timed games use each team's own start time. A paused team may resume only within 100 metres of its pause location.
+- Temporary road restrictions come from the Tarktee ArcGIS REST service.
+- Numeric normal speed limits are synchronized from OpenStreetMap through Overpass. Tarktee numeric variable/increased limits override OSM, and manually configured zones override both.
+- Speed penalties require more than 10 seconds above 110% of a known numeric limit. GPS points with poor accuracy or implausible movement are ignored by the speed calculation.
+
+Public Overpass instances are used only during an admin-triggered synchronization. Players never query Overpass directly. Map and road data require the attribution and licensing terms of their respective providers.
+
+Nägemata Eesti maintenance commands:
+
+```sh
+php bin/create-nagemata-totals.php
+php bin/generate-player-maps.php
+```
+
+The first command creates or refreshes the Total Kruus and Total Asfalt games unless they already contain submissions. The second enables six-hour timing and GPX export for imported Nägemata Eesti games and regenerates their player maps.
+
 ## Apache proxy sketch
 
 Run on the server with sudo rights:

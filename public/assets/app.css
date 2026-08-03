@@ -631,6 +631,24 @@ textarea { min-height: 92px; resize: vertical; }
 .podium-place b { font-size: 20px; }
 .podium-place span { font-weight: 850; }
 .paths { overflow: auto; max-height: 420px; background: #fff; border: 1px solid var(--line); border-radius: 8px; padding: 12px; }
+.game-clock {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+  margin: 0 0 12px;
+  padding: 12px 16px;
+  border: 1px solid var(--line);
+  border-left: 5px solid var(--green);
+  border-radius: 8px;
+  background: #fff;
+}
+.game-clock div { display: grid; gap: 2px; }
+.game-clock b { font-size: 24px; font-variant-numeric: tabular-nums; }
+.game-clock.paused { border-left-color: var(--orange); }
+.game-clock.expired { border-left-color: #b3261e; }
+.map-export-button { margin-top: 12px; }
+.game-start-panel { margin-inline: auto; }
 
 @media (max-width: 780px) {
   .grid.two, .inline-form, .team-row, .submission-row, .question-row, .question-summary, .stacked-form, .register-layout, .register-form, .search-form, .share-box { grid-template-columns: 1fr; }
@@ -643,4 +661,5 @@ textarea { min-height: 92px; resize: vertical; }
   .timeline-labels { grid-template-columns: 1fr; }
   .timeline-labels b, .timeline-labels span:last-child { text-align: left; }
   .map-shell { height: calc(100vh - 128px); }
+  .game-clock { position: sticky; top: 58px; z-index: 700; }
 }

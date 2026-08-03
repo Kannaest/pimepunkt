@@ -27,8 +27,14 @@
     </label>
     <label>Kohal <input name="default_visit_points" type="number" value="<?= e((string)$game['default_visit_points']) ?>"></label>
     <label>Vale miinus <input name="default_wrong_penalty" type="number" value="<?= e((string)$game['default_wrong_penalty']) ?>"></label>
+    <label>Ajapiirang minutites <input name="duration_minutes" type="number" min="0" value="<?= e((string)($game['duration_minutes'] ?? '')) ?>" placeholder="Piiramata"></label>
+    <label>Stardiaken algab <input name="start_window_from" type="datetime-local" value="<?= e($game['start_window_from'] ? date('Y-m-d\TH:i', strtotime($game['start_window_from'])) : '') ?>"></label>
+    <label>Stardiaken lõpeb <input name="start_window_to" type="datetime-local" value="<?= e($game['start_window_to'] ? date('Y-m-d\TH:i', strtotime($game['start_window_to'])) : '') ?>"></label>
+    <label>Kiiruseületuse miinus <input name="speeding_penalty" type="number" min="0" value="<?= e((string)($game['speeding_penalty'] ?? 7)) ?>"></label>
     <label class="checkbox-label"><input name="auto_approve_teams" type="checkbox" value="1" <?= (int)($game['auto_approve_teams'] ?? 0) === 1 ? 'checked' : '' ?>> Kinnita registreerujad automaatselt</label>
     <label class="checkbox-label"><input name="public_results_enabled" type="checkbox" value="1" <?= (int)$game['public_results_enabled'] === 1 ? 'checked' : '' ?>> Tulemused avalikus vaates</label>
+    <label class="checkbox-label"><input name="allow_gpx_export" type="checkbox" value="1" <?= (int)($game['allow_gpx_export'] ?? 0) === 1 ? 'checked' : '' ?>> Luba mängijal GPX eksport</label>
+    <label class="checkbox-label"><input name="show_traffic_restrictions" type="checkbox" value="1" <?= (int)($game['show_traffic_restrictions'] ?? 1) === 1 ? 'checked' : '' ?>> Näita Tarktee piiranguid admini kaardil</label>
     <button class="button primary">Salvesta</button>
   </form>
   <div class="share-box">
@@ -49,6 +55,11 @@
       <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
       <label>JPG/PNG kaart <input name="map" type="file" accept="image/jpeg,image/png" required></label>
       <button class="button">Lae kaart</button>
+    </form>
+    <form method="post" action="<?= e(path('/admin/games/' . $game['id'] . '/map-generate')) ?>">
+      <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+      <button class="button">Genereeri halltoonides kaart</button>
+      <p class="muted">Kasutab Maa- ja Ruumiameti hallkaarti, ligikaudu mõõtkavas 1:80 000 või suurema ala korral punktide ulatust.</p>
     </form>
     <div class="prompt-box">
       <div class="section-head">
@@ -90,6 +101,37 @@
         </div>
       <?php endforeach; ?>
     </div>
+  </div>
+</section>
+
+<section class="panel">
+  <div class="section-head">
+    <h2>Kiiruspiirangud</h2>
+    <form method="post" action="<?= e(path('/admin/games/' . $game['id'] . '/speed-sync')) ?>">
+      <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+      <button class="button">Sünkrooni OpenStreetMapist</button>
+    </form>
+  </div>
+  <p class="muted">Sünkroonitakse ainult teed, millel on numbriline maxspeed. Tarktee ajutised sulgemised kuvatakse live-kaardil eraldi.</p>
+  <form class="inline-form" method="post" action="<?= e(path('/admin/games/' . $game['id'] . '/speed-zones')) ?>">
+    <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+    <label>Nimi <input name="name" required></label>
+    <label>Lat <input name="lat" inputmode="decimal" required></label>
+    <label>Lng <input name="lng" inputmode="decimal" required></label>
+    <label>Raadius m <input name="radius_m" type="number" min="10" value="100" required></label>
+    <label>Piirang km/h <input name="speed_limit_kmh" type="number" min="5" max="200" required></label>
+    <button class="button">Lisa ala</button>
+  </form>
+  <div class="list compact-list">
+    <?php foreach ($speedZones as $zone): ?>
+      <div class="row">
+        <span><b><?= e($zone['name']) ?></b> · <?= e((string)$zone['speed_limit_kmh']) ?> km/h · <?= e($zone['source']) ?></span>
+        <form method="post" action="<?= e(path('/admin/speed-zones/' . $zone['id'] . '/delete')) ?>">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <button class="icon-button warn">Kustuta</button>
+        </form>
+      </div>
+    <?php endforeach; ?>
   </div>
 </section>
 

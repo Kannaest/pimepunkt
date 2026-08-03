@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 require __DIR__ . '/../src/bootstrap.php';
+require __DIR__ . '/../src/game_services.php';
 
 start_session();
 send_security_headers();
@@ -83,12 +84,32 @@ function dispatch(string $method, string $route): void
         game_view();
         return;
     }
+    if ($route === '/game/start' && $method === 'POST') {
+        game_start_post();
+        return;
+    }
+    if ($route === '/game/pause' && $method === 'POST') {
+        game_pause_post(false);
+        return;
+    }
+    if ($route === '/game/resume' && $method === 'POST') {
+        game_pause_post(true);
+        return;
+    }
     if ($route === '/answer' && $method === 'POST') {
         answer_post();
         return;
     }
     if ($route === '/location' && $method === 'POST') {
         location_post();
+        return;
+    }
+    if (preg_match('#^/games/(\d+)/checkpoints\.gpx$#', $route, $m) && $method === 'GET') {
+        game_gpx_download((int)$m[1]);
+        return;
+    }
+    if (preg_match('#^/games/(\d+)/traffic$#', $route, $m) && $method === 'GET') {
+        game_traffic_json((int)$m[1]);
         return;
     }
     if (preg_match('#^/results/(\d+)$#', $route, $m)) {
@@ -302,6 +323,22 @@ function admin_dispatch(string $method, string $route): void
         admin_map_upload((int)$m[1]);
         return;
     }
+    if (preg_match('#^/admin/games/(\d+)/map-generate$#', $route, $m) && $method === 'POST') {
+        admin_map_generate((int)$m[1]);
+        return;
+    }
+    if (preg_match('#^/admin/games/(\d+)/speed-sync$#', $route, $m) && $method === 'POST') {
+        admin_speed_sync((int)$m[1]);
+        return;
+    }
+    if (preg_match('#^/admin/games/(\d+)/speed-zones$#', $route, $m) && $method === 'POST') {
+        admin_speed_zone_create((int)$m[1]);
+        return;
+    }
+    if (preg_match('#^/admin/speed-zones/(\d+)/delete$#', $route, $m) && $method === 'POST') {
+        admin_speed_zone_delete((int)$m[1]);
+        return;
+    }
     if (preg_match('#^/admin/games/(\d+)/gpx$#', $route, $m) && $method === 'POST') {
         admin_gpx_import((int)$m[1]);
         return;
@@ -342,6 +379,10 @@ function admin_dispatch(string $method, string $route): void
         admin_submission_adjust((int)$m[1]);
         return;
     }
+    if (preg_match('#^/admin/speeding/(\d+)/(confirm|dismiss)$#', $route, $m) && $method === 'POST') {
+        admin_speeding_action((int)$m[1], $m[2]);
+        return;
+    }
     if (preg_match('#^/admin/live/(\d+)$#', $route, $m)) {
         admin_live((int)$m[1]);
         return;
@@ -370,6 +411,8 @@ function admin_game(int $id): void
     ');
     $checkpoints->execute([$id]);
     $checkpointRows = $checkpoints->fetchAll();
+    $speedZones = db()->prepare('SELECT * FROM speed_zones WHERE game_id = ? ORDER BY source, name');
+    $speedZones->execute([$id]);
     $options = [];
     $questionIds = array_values(array_filter(array_map(fn($cp) => $cp['question_id'] ?? null, $checkpointRows)));
     if ($questionIds) {
@@ -393,6 +436,7 @@ function admin_game(int $id): void
         'admin' => current_admin(),
         'gameAdmins' => game_admins($id),
         'allAdmins' => db()->query('SELECT * FROM admins ORDER BY email')->fetchAll(),
+        'speedZones' => $speedZones->fetchAll(),
     ]);
 }
 
@@ -405,7 +449,10 @@ function admin_game_update(int $id): void
     if (!in_array($status, $allowed, true)) {
         $status = 'draft';
     }
-    $stmt = db()->prepare('UPDATE games SET name = ?, status = ?, default_visit_points = ?, default_wrong_penalty = ?, auto_approve_teams = ?, public_results_enabled = ?, started_at = IF(? = "running" AND started_at IS NULL, NOW(), started_at), finished_at = IF(? IN ("finished","results_review","results_public") AND finished_at IS NULL, NOW(), finished_at) WHERE id = ?');
+    $startFrom = datetime_input_value($_POST['start_window_from'] ?? null);
+    $startTo = datetime_input_value($_POST['start_window_to'] ?? null);
+    $duration = max(0, (int)($_POST['duration_minutes'] ?? 0)) ?: null;
+    $stmt = db()->prepare('UPDATE games SET name = ?, status = ?, default_visit_points = ?, default_wrong_penalty = ?, auto_approve_teams = ?, public_results_enabled = ?, allow_gpx_export = ?, show_traffic_restrictions = ?, duration_minutes = ?, start_window_from = ?, start_window_to = ?, speeding_penalty = ?, started_at = IF(? = "running" AND started_at IS NULL, NOW(), started_at), finished_at = IF(? IN ("finished","results_review","results_public") AND finished_at IS NULL, NOW(), finished_at) WHERE id = ?');
     $stmt->execute([
         trim((string)$_POST['name']),
         $status,
@@ -413,12 +460,26 @@ function admin_game_update(int $id): void
         (int)$_POST['default_wrong_penalty'],
         isset($_POST['auto_approve_teams']) ? 1 : 0,
         isset($_POST['public_results_enabled']) ? 1 : 0,
+        isset($_POST['allow_gpx_export']) ? 1 : 0,
+        isset($_POST['show_traffic_restrictions']) ? 1 : 0,
+        $duration,
+        $startFrom,
+        $startTo,
+        max(0, (int)($_POST['speeding_penalty'] ?? 7)),
         $status,
         $status,
         $id,
     ]);
     audit('game_updated', $id, null, ['status' => $status]);
     redirect_to('/admin/games/' . $id);
+}
+
+function datetime_input_value(mixed $value): ?string
+{
+    $value = trim((string)$value);
+    if ($value === '') return null;
+    $date = DateTimeImmutable::createFromFormat('Y-m-d\TH:i', $value);
+    return $date ? $date->format('Y-m-d H:i:s') : null;
 }
 
 function admin_map_upload(int $id): void
@@ -452,6 +513,68 @@ function admin_map_upload(int $id): void
     $stmt->execute([$path, $id]);
     audit('map_uploaded', $id);
     redirect_to('/admin/games/' . $id);
+}
+
+function admin_map_generate(int $id): void
+{
+    require_game_access($id);
+    require_csrf();
+    try {
+        generate_player_map($id);
+        audit('map_generated', $id);
+        flash('Halltoonides mängijakaart genereeriti punktide ulatuse järgi.');
+    } catch (Throwable $e) {
+        error_log($e);
+        flash('Kaarti ei saanud genereerida: ' . $e->getMessage());
+    }
+    redirect_to('/admin/games/' . $id);
+}
+
+function admin_speed_sync(int $id): void
+{
+    require_game_access($id);
+    require_csrf();
+    try {
+        $osmCount = sync_overpass_speed_zones($id);
+        $tarkteeCount = sync_tarktee_speed_zones($id);
+        audit('speed_zones_synced', $id, null, ['osm' => $osmCount, 'tarktee' => $tarkteeCount]);
+        flash('Sünkrooniti ' . $osmCount . ' OSM-i teelõiku ja ' . $tarkteeCount . ' Tarktee numbrilist piirangut.');
+    } catch (Throwable $e) {
+        error_log($e);
+        flash('Kiiruspiiranguid ei saanud sünkroonida: ' . $e->getMessage());
+    }
+    redirect_to('/admin/games/' . $id);
+}
+
+function admin_speed_zone_create(int $gameId): void
+{
+    require_game_access($gameId);
+    require_csrf();
+    $lat = filter_var($_POST['lat'] ?? null, FILTER_VALIDATE_FLOAT);
+    $lng = filter_var($_POST['lng'] ?? null, FILTER_VALIDATE_FLOAT);
+    $limit = (int)($_POST['speed_limit_kmh'] ?? 0);
+    $radius = (int)($_POST['radius_m'] ?? 0);
+    if ($lat === false || $lng === false || $limit < 5 || $limit > 200 || $radius < 10 || $radius > 10000) {
+        flash('Kontrolli kiirusala koordinaate, piirangut ja raadiust.');
+        redirect_to('/admin/games/' . $gameId);
+    }
+    $sourceId = 'manual:' . bin2hex(random_bytes(8));
+    db()->prepare('INSERT INTO speed_zones (game_id, source, source_id, name, speed_limit_kmh, geometry_type, center_lat, center_lng, radius_m) VALUES (?, "admin", ?, ?, ?, "circle", ?, ?, ?)')
+        ->execute([$gameId, $sourceId, trim((string)($_POST['name'] ?? 'Kiirusala')), $limit, $lat, $lng, $radius]);
+    audit('speed_zone_created', $gameId, null, ['limit' => $limit]);
+    redirect_to('/admin/games/' . $gameId);
+}
+
+function admin_speed_zone_delete(int $zoneId): void
+{
+    require_csrf();
+    $stmt = db()->prepare('SELECT game_id FROM speed_zones WHERE id = ?');
+    $stmt->execute([$zoneId]);
+    $gameId = (int)$stmt->fetchColumn();
+    require_game_access($gameId);
+    db()->prepare('DELETE FROM speed_zones WHERE id = ?')->execute([$zoneId]);
+    audit('speed_zone_deleted', $gameId, null, ['speed_zone_id' => $zoneId]);
+    redirect_to('/admin/games/' . $gameId);
 }
 
 function admin_gpx_import(int $gameId): void
@@ -554,7 +677,17 @@ function admin_gpx_import(int $gameId): void
     }
 
     audit('gpx_imported', $gameId, null, ['imported' => $imported, 'skipped' => $skipped, 'overwrite' => $overwrite]);
-    flash('GPX import valmis: lisatud ' . $imported . ', vahele jäetud ' . $skipped . '.');
+    $mapMessage = '';
+    if ($imported > 0) {
+        try {
+            generate_player_map($gameId);
+            $mapMessage = ' Mängijakaart genereeriti uuesti.';
+        } catch (Throwable $e) {
+            error_log($e);
+            $mapMessage = ' Punktid imporditi, kuid kaarti ei saanud automaatselt genereerida.';
+        }
+    }
+    flash('GPX import valmis: lisatud ' . $imported . ', vahele jäetud ' . $skipped . '.' . $mapMessage);
     redirect_to('/admin/games/' . $gameId);
 }
 
@@ -804,6 +937,20 @@ function admin_submission_adjust(int $submissionId): void
     redirect_to('/admin/live/' . $data['game_id']);
 }
 
+function admin_speeding_action(int $eventId, string $action): void
+{
+    require_csrf();
+    $stmt = db()->prepare('SELECT t.game_id FROM speeding_events se JOIN teams t ON t.id=se.team_id WHERE se.id=?');
+    $stmt->execute([$eventId]);
+    $gameId = (int)$stmt->fetchColumn();
+    require_game_access($gameId);
+    $status = $action === 'dismiss' ? 'dismissed' : 'confirmed';
+    $penalty = $status === 'confirmed' ? (int)find_game($gameId)['speeding_penalty'] : 0;
+    db()->prepare('UPDATE speeding_events SET status=?, penalty_points=? WHERE id=?')->execute([$status, $penalty, $eventId]);
+    audit('speeding_' . $status, $gameId, null, ['event_id' => $eventId]);
+    redirect_to('/admin/live/' . $gameId);
+}
+
 function admin_live(int $gameId): void
 {
     require_game_access($gameId);
@@ -822,11 +969,14 @@ function admin_live(int $gameId): void
     $submissions->execute([$gameId]);
     $teams = db()->prepare('SELECT id, name, excluded_from_results FROM teams WHERE game_id = ? ORDER BY name');
     $teams->execute([$gameId]);
+    $speeding = db()->prepare('SELECT se.*, t.name team_name, sz.name zone_name FROM speeding_events se JOIN teams t ON t.id=se.team_id LEFT JOIN speed_zones sz ON sz.id=se.speed_zone_id WHERE t.game_id=? ORDER BY se.started_at DESC LIMIT 100');
+    $speeding->execute([$gameId]);
     render('admin_live', [
         'game' => $game,
         'scoreboard' => scoreboard($gameId),
         'submissions' => $submissions->fetchAll(),
         'teams' => $teams->fetchAll(),
+        'speedingEvents' => $speeding->fetchAll(),
     ]);
 }
 
@@ -935,6 +1085,10 @@ function game_view(): void
         render('game_wait', ['team' => $team, 'game' => $game]);
         return;
     }
+    if ($game['duration_minutes'] && !$team['play_started_at']) {
+        render('game_start', ['team' => $team, 'game' => $game]);
+        return;
+    }
     $stmt = db()->prepare('
         SELECT c.*, q.id AS question_id, q.type AS question_type, q.text AS question_text,
                s.id AS submission_id
@@ -956,7 +1110,66 @@ function game_view(): void
             $options[(int)$option['question_id']][] = $option;
         }
     }
-    render('game_play', ['team' => $team, 'game' => $game, 'checkpoints' => $checkpoints, 'options' => $options]);
+    render('game_play', [
+        'team' => $team,
+        'game' => $game,
+        'checkpoints' => $checkpoints,
+        'options' => $options,
+        'deadline' => team_deadline($team, $game),
+        'timeExpired' => team_time_expired($team, $game),
+    ]);
+}
+
+function game_start_post(): void
+{
+    require_csrf();
+    $team = current_team();
+    if (!$team || $team['status'] !== 'approved' || $team['game_status'] !== 'running') {
+        http_response_code(403);
+        exit('Mängu ei saa alustada.');
+    }
+    $game = find_game((int)$team['game_id']);
+    $now = new DateTimeImmutable();
+    if (($game['start_window_from'] && $now < new DateTimeImmutable($game['start_window_from'])) ||
+        ($game['start_window_to'] && $now > new DateTimeImmutable($game['start_window_to']))) {
+        flash('Mängu alustamine ei ole praegu lubatud stardiaknas.');
+        redirect_to('/game');
+    }
+    db()->prepare('UPDATE teams SET play_started_at = COALESCE(play_started_at, NOW()) WHERE id = ?')->execute([(int)$team['id']]);
+    audit('team_game_started', (int)$team['game_id'], (int)$team['id']);
+    redirect_to('/game');
+}
+
+function game_pause_post(bool $resume): void
+{
+    require_csrf();
+    $team = current_team();
+    if (!$team || $team['status'] !== 'approved' || $team['game_status'] !== 'running') {
+        http_response_code(403);
+        exit('Mäng ei ole aktiivne.');
+    }
+    $lat = filter_var($_POST['lat'] ?? null, FILTER_VALIDATE_FLOAT);
+    $lng = filter_var($_POST['lng'] ?? null, FILTER_VALIDATE_FLOAT);
+    if ($lat === false || $lng === false) {
+        flash('Pausi muutmiseks on vaja GPS-asukohta.');
+        redirect_to('/game');
+    }
+    if ($resume) {
+        if (!$team['paused_at']) redirect_to('/game');
+        if (haversine_m((float)$team['pause_lat'], (float)$team['pause_lng'], (float)$lat, (float)$lng) > 100) {
+            flash('Jätkata saab kuni 100 m kaugusel pausi asukohast.');
+            redirect_to('/game');
+        }
+        db()->prepare('UPDATE teams SET paused_seconds = paused_seconds + TIMESTAMPDIFF(SECOND, paused_at, NOW()), paused_at = NULL, pause_lat = NULL, pause_lng = NULL WHERE id = ?')
+            ->execute([(int)$team['id']]);
+        audit('team_game_resumed', (int)$team['game_id'], (int)$team['id']);
+    } else {
+        if ($team['paused_at']) redirect_to('/game');
+        db()->prepare('UPDATE teams SET paused_at = NOW(), pause_lat = ?, pause_lng = ? WHERE id = ?')
+            ->execute([$lat, $lng, (int)$team['id']]);
+        audit('team_game_paused', (int)$team['game_id'], (int)$team['id']);
+    }
+    redirect_to('/game');
 }
 
 function answer_post(): void
@@ -966,6 +1179,11 @@ function answer_post(): void
     if (!$team || $team['status'] !== 'approved' || $team['game_status'] !== 'running') {
         http_response_code(403);
         exit('Mäng ei ole vastamiseks avatud.');
+    }
+    $game = find_game((int)$team['game_id']);
+    if ($team['paused_at'] || team_time_expired($team, $game)) {
+        flash($team['paused_at'] ? 'Mäng on pausil.' : 'Mänguaeg on lõppenud.');
+        redirect_to('/game');
     }
     $checkpointId = (int)$_POST['checkpoint_id'];
     $lat = (float)$_POST['lat'];
@@ -1035,9 +1253,50 @@ function location_post(): void
         return;
     }
     $payload = json_decode(file_get_contents('php://input') ?: '{}', true);
-    $stmt = db()->prepare('INSERT INTO location_logs (team_id, lat, lng, accuracy_m) VALUES (?, ?, ?, ?)');
-    $stmt->execute([(int)$team['id'], (float)$payload['lat'], (float)$payload['lng'], isset($payload['accuracy']) ? (float)$payload['accuracy'] : null]);
-    http_response_code(204);
+    $lat = filter_var($payload['lat'] ?? null, FILTER_VALIDATE_FLOAT);
+    $lng = filter_var($payload['lng'] ?? null, FILTER_VALIDATE_FLOAT);
+    $accuracy = filter_var($payload['accuracy'] ?? null, FILTER_VALIDATE_FLOAT);
+    if ($lat === false || $lng === false || $accuracy === false || abs((float)$lat) > 90 || abs((float)$lng) > 180) {
+        http_response_code(422);
+        return;
+    }
+    $result = record_location_and_speed($team, (float)$lat, (float)$lng, max(0, (float)$accuracy));
+    header('Content-Type: application/json');
+    echo json_encode($result);
+}
+
+function game_gpx_download(int $gameId): void
+{
+    $game = find_game($gameId);
+    $team = current_team();
+    $admin = current_admin();
+    $allowedTeam = $team && (int)$team['game_id'] === $gameId && $team['status'] === 'approved';
+    if (!$admin && (!$allowedTeam || (int)$game['allow_gpx_export'] !== 1)) {
+        http_response_code(404);
+        exit('GPX eksport ei ole lubatud.');
+    }
+    header('Content-Type: application/gpx+xml; charset=UTF-8');
+    header('Content-Disposition: attachment; filename="pimepunkt-' . $gameId . '.gpx"');
+    echo game_gpx($gameId);
+}
+
+function game_traffic_json(int $gameId): void
+{
+    $game = find_game($gameId);
+    $team = current_team();
+    $admin = current_admin();
+    if (!$admin && (!$team || (int)$team['game_id'] !== $gameId || $team['status'] !== 'approved')) {
+        http_response_code(403);
+        return;
+    }
+    $restrictions = ['type' => 'FeatureCollection', 'features' => []];
+    if ((int)$game['show_traffic_restrictions'] === 1) {
+        try { $restrictions = tarktee_restrictions_geojson($gameId); } catch (Throwable $e) { error_log($e); }
+    }
+    $zones = db()->prepare('SELECT id, source, name, speed_limit_kmh, geometry_type, center_lat, center_lng, radius_m, geometry_json FROM speed_zones WHERE game_id = ?');
+    $zones->execute([$gameId]);
+    header('Content-Type: application/json');
+    echo json_encode(['restrictions' => $restrictions, 'speed_zones' => $zones->fetchAll()], JSON_UNESCAPED_UNICODE);
 }
 
 function admin_locations_json(int $gameId): void
@@ -1045,7 +1304,7 @@ function admin_locations_json(int $gameId): void
     require_admin();
     require_game_access($gameId);
     $stmt = db()->prepare('
-        SELECT t.id AS team_id, t.name, l.lat, l.lng, l.accuracy_m, l.created_at
+        SELECT t.id AS team_id, t.name, l.lat, l.lng, l.accuracy_m, l.filtered_speed_kmh, l.speed_limit_kmh, l.ignored_reason, l.created_at
         FROM teams t
         JOIN location_logs l ON l.team_id = t.id
         WHERE t.game_id = ?
@@ -1367,7 +1626,8 @@ function scoreboard(int $gameId): array
                  COALESCE(c.visit_points, ? + CASE c.difficulty WHEN 2 THEN 2 WHEN 3 THEN 4 WHEN 4 THEN 7 WHEN 5 THEN 10 WHEN 6 THEN 13 ELSE 0 END) -
                  CASE WHEN COALESCE(s.admin_correct_override, s.is_correct) = 1 THEN 0 ELSE COALESCE(c.wrong_penalty, ?) END +
                  s.admin_score_adjustment
-               ), 0) AS score
+               ), 0) - COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS score,
+               COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS speeding_penalty
         FROM teams t
         LEFT JOIN submissions s ON s.team_id = t.id
         LEFT JOIN checkpoints c ON c.id = s.checkpoint_id
