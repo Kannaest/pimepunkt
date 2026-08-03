@@ -256,13 +256,13 @@ foreach ($events as $event) {
                 continue;
             }
             $gameId = (int)$game['id'];
-            $pdo->prepare("UPDATE games SET status = IF(status IN ('draft','registration_open','waiting_start'), 'waiting_start', status), auto_approve_teams = 1, allow_gpx_export = 1, duration_minutes = 360, speeding_penalty = 7 WHERE id = ?")
+            $pdo->prepare("UPDATE games SET status = IF(status IN ('draft','registration_open','waiting_start'), 'running', status), auto_approve_teams = 1, allow_gpx_export = 1, duration_minutes = 360, speeding_penalty = 7, started_at = COALESCE(started_at, NOW()) WHERE id = ?")
                 ->execute([$gameId]);
             $pdo->prepare('DELETE FROM checkpoints WHERE game_id = ?')->execute([$gameId]);
             $replaced++;
         } else {
-            $insert = $pdo->prepare('INSERT INTO games (name, status, default_visit_points, default_wrong_penalty, auto_approve_teams, created_by_admin_id, public_results_enabled, allow_gpx_export, duration_minutes, speeding_penalty) VALUES (?, ?, 3, 2, 1, ?, 1, 1, 360, 7)');
-            $insert->execute([$event['event_name'], 'waiting_start', (int)$admin['id']]);
+            $insert = $pdo->prepare('INSERT INTO games (name, status, default_visit_points, default_wrong_penalty, auto_approve_teams, created_by_admin_id, public_results_enabled, allow_gpx_export, duration_minutes, speeding_penalty, started_at) VALUES (?, ?, 3, 2, 1, ?, 1, 1, 360, 7, NOW())');
+            $insert->execute([$event['event_name'], 'running', (int)$admin['id']]);
             $gameId = (int)$pdo->lastInsertId();
             $created++;
         }
@@ -293,7 +293,7 @@ foreach ($events as $event) {
                 'event_id' => $event['event_id'],
                 'checkpoints' => count($event['points']),
                 'correct_answers' => $event['solved'],
-                'status' => 'waiting_start',
+                'status' => 'running',
                 'auto_approve_teams' => true,
             ], JSON_UNESCAPED_UNICODE | JSON_THROW_ON_ERROR),
         ]);

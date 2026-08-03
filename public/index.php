@@ -26,7 +26,7 @@ if ($route !== '/') {
 try {
     dispatch($method, $route);
 } catch (Throwable $e) {
-    error_log($e);
+    error_log((string)$e);
     http_response_code(500);
     render('error', ['message' => 'Rakenduses tekkis viga. Proovi hetke pärast uuesti.']);
 }
@@ -1061,13 +1061,7 @@ function register_form(): void
     $stmt = db()->prepare($sql);
     $stmt->execute($params);
     $games = $stmt->fetchAll();
-    $overviewBounds = null;
-    if ($gameId > 0 && $games) {
-        $bounds = game_bounds($gameId);
-        if ($bounds) {
-            $overviewBounds = generated_map_bounds($bounds, 1, 1);
-        }
-    }
+    $overviewBounds = $gameId > 0 && $games ? game_overview_bounds($gameId) : null;
     $played = db()->query("SELECT * FROM games WHERE status = 'results_public' AND public_results_enabled = 1 ORDER BY finished_at DESC, created_at DESC LIMIT 20")->fetchAll();
     render('register', [
         'games' => $games,
@@ -1163,7 +1157,11 @@ function game_view(): void
         return;
     }
     if ($game['duration_minutes'] && !$team['play_started_at']) {
-        render('game_start', ['team' => $team, 'game' => $game]);
+        render('game_start', [
+            'team' => $team,
+            'game' => $game,
+            'overviewBounds' => game_overview_bounds((int)$game['id']),
+        ]);
         return;
     }
     $progressStmt = db()->prepare('SELECT COUNT(*) total_count, COUNT(s.id) answered_count FROM checkpoints c LEFT JOIN submissions s ON s.checkpoint_id=c.id AND s.team_id=? WHERE c.game_id=?');
@@ -1244,6 +1242,10 @@ function game_pause_post(bool $resume): void
         http_response_code(403);
         exit('Mäng ei ole aktiivne.');
     }
+    if (!$team['play_started_at']) {
+        http_response_code(409);
+        exit('Mäng ei ole veel alanud.');
+    }
     $lat = filter_var($_POST['lat'] ?? null, FILTER_VALIDATE_FLOAT);
     $lng = filter_var($_POST['lng'] ?? null, FILTER_VALIDATE_FLOAT);
     if ($lat === false || $lng === false) {
@@ -1277,7 +1279,11 @@ function answer_post(): void
         exit('Mäng ei ole vastamiseks avatud.');
     }
     $game = find_game((int)$team['game_id']);
-    if ($team['paused_at'] || team_time_expired($team, $game)) {
+    if (($game['duration_minutes'] && !$team['play_started_at']) || $team['paused_at'] || team_time_expired($team, $game)) {
+        if ($game['duration_minutes'] && !$team['play_started_at']) {
+            flash('Alusta mäng enne vastamist.');
+            redirect_to('/game');
+        }
         flash($team['paused_at'] ? 'Mäng on pausil.' : 'Mänguaeg on lõppenud.');
         redirect_to('/game');
     }
@@ -1344,7 +1350,12 @@ function answer_post(): void
 function location_post(): void
 {
     $team = current_team();
-    if (!$team || $team['game_status'] !== 'running') {
+    if (!$team || $team['status'] !== 'approved' || $team['game_status'] !== 'running' || !$team['play_started_at'] || $team['paused_at']) {
+        http_response_code(204);
+        return;
+    }
+    $game = find_game((int)$team['game_id']);
+    if (team_time_expired($team, $game)) {
         http_response_code(204);
         return;
     }
@@ -1728,7 +1739,17 @@ function scoreboard(int $gameId): array
                  CASE WHEN COALESCE(s.admin_correct_override, s.is_correct) = 1 THEN 0 ELSE COALESCE(c.wrong_penalty, ?) END +
                  s.admin_score_adjustment
                ), 0) - COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS score,
-               COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS speeding_penalty
+               COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS speeding_penalty,
+               CASE WHEN t.play_started_at IS NULL THEN NULL ELSE
+                 LEAST(?, GREATEST(0,
+                   CAST(TIMESTAMPDIFF(SECOND, t.play_started_at,
+                     GREATEST(
+                       COALESCE((SELECT MAX(s2.created_at) FROM submissions s2 WHERE s2.team_id = t.id), t.play_started_at),
+                       COALESCE((SELECT MAX(l2.created_at) FROM location_logs l2 WHERE l2.team_id = t.id), t.play_started_at)
+                     )
+                   ) AS SIGNED) - CAST(t.paused_seconds AS SIGNED)
+                 ))
+               END AS elapsed_seconds
         FROM teams t
         LEFT JOIN submissions s ON s.team_id = t.id
         LEFT JOIN checkpoints c ON c.id = s.checkpoint_id
@@ -1736,6 +1757,7 @@ function scoreboard(int $gameId): array
         GROUP BY t.id
         ORDER BY score DESC, correct_count DESC, visited DESC, t.name
     ');
-    $stmt->execute([(int)$game['default_visit_points'], (int)$game['default_wrong_penalty'], $gameId]);
+    $maximumSeconds = $game['duration_minutes'] ? (int)$game['duration_minutes'] * 60 : 2147483647;
+    $stmt->execute([(int)$game['default_visit_points'], (int)$game['default_wrong_penalty'], $maximumSeconds, $gameId]);
     return $stmt->fetchAll();
 }

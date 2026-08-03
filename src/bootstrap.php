@@ -438,21 +438,53 @@ function partial(string $template, array $data = []): void
     require __DIR__ . '/../templates/' . $template . '.php';
 }
 
+function format_elapsed_seconds(mixed $seconds): string
+{
+    if ($seconds === null || $seconds === '') {
+        return 'puudub';
+    }
+    $seconds = max(0, (int)$seconds);
+    return sprintf('%02d:%02d:%02d', intdiv($seconds, 3600), intdiv($seconds % 3600, 60), $seconds % 60);
+}
+
 function send_magic_link(string $email, string $link, string $purpose): void
 {
     $subject = $purpose === 'admin' ? 'Pimepunkt admini sisselogimislink' : 'Pimepunkt registreerimislink';
     $body = "Ava Pimepunkti jätkamiseks see link:\n\n{$link}\n\nLink kehtib 30 minutit ja seda saab kasutada üks kord.";
     if (config()['mail']['mode'] === 'smtp') {
-        send_smtp_email($email, $subject, $body);
+        try {
+            send_smtp_email($email, $subject, $body);
+            log_mail_delivery($email, $purpose, 'smtp', 'accepted');
+        } catch (Throwable $exception) {
+            log_mail_delivery($email, $purpose, 'smtp', 'failed', $exception->getMessage());
+            throw $exception;
+        }
         return;
     }
     if (config()['mail']['mode'] === 'mail') {
-        @mail($email, $subject, $body, 'From: ' . config()['mail']['from']);
+        $sent = @mail($email, $subject, $body, 'From: ' . config()['mail']['from']);
+        log_mail_delivery($email, $purpose, 'mail', $sent ? 'accepted' : 'failed');
+        if (!$sent) {
+            throw new RuntimeException('E-kirja saatmine ebaõnnestus.');
+        }
         return;
     }
 
     $line = sprintf("[%s] To: %s Purpose: %s Link: %s\n", date('c'), $email, $purpose, $link);
     file_put_contents(__DIR__ . '/../storage/mail/magic-links.log', $line, FILE_APPEND);
+}
+
+function log_mail_delivery(string $email, string $purpose, string $transport, string $status, string $detail = ''): void
+{
+    $record = json_encode([
+        'time' => date(DATE_ATOM),
+        'recipient' => strtolower($email),
+        'purpose' => $purpose,
+        'transport' => $transport,
+        'status' => $status,
+        'detail' => mb_substr($detail, 0, 300),
+    ], JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) . "\n";
+    file_put_contents(__DIR__ . '/../storage/mail/delivery.log', $record, FILE_APPEND | LOCK_EX);
 }
 
 function send_smtp_email(string $to, string $subject, string $body): void
@@ -490,10 +522,13 @@ function send_smtp_email(string $to, string $subject, string $body): void
     smtp_command($socket, 'DATA', 354);
 
     $encodedSubject = '=?UTF-8?B?' . base64_encode($subject) . '?=';
+    $messageDomain = preg_replace('/[^a-z0-9.-]/i', '', substr(strrchr((string)$mail['from'], '@') ?: '@kand.ee', 1)) ?: 'kand.ee';
     $headers = [
         'From: Pimepunkt <' . $mail['from'] . '>',
         'To: <' . $to . '>',
         'Subject: ' . $encodedSubject,
+        'Date: ' . date(DATE_RFC2822),
+        'Message-ID: <' . bin2hex(random_bytes(16)) . '@' . $messageDomain . '>',
         'MIME-Version: 1.0',
         'Content-Type: text/plain; charset=UTF-8',
         'Content-Transfer-Encoding: 8bit',

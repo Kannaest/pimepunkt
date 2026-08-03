@@ -60,7 +60,7 @@ php bin/generate-player-maps.php --all-generated
 
 The first command creates or refreshes the Total Kruus and Total Asfalt games unless they already contain submissions. The second enables six-hour timing and GPX export for imported Nägemata Eesti games and regenerates their player maps. The final variant regenerates every automatically generated map without replacing manually uploaded images.
 
-The superadmin dashboard can check and synchronize the 20 latest completed public Nägemata Eesti events directly from Nutilogi. The first synchronization links legacy imports by `eventId`; later source changes update only games that have no teams and have not started. New games use `waiting_start`, automatic team approval, six-hour timing, GPX export, and a generated player map.
+The superadmin dashboard can check and synchronize the 20 latest completed public Nägemata Eesti events directly from Nutilogi. The first synchronization links legacy imports by `eventId`; later source changes update only games that have no teams. New games use `running`, automatic team approval, six-hour per-team timing, GPX export, and a generated player map. The player's six-hour clock starts only after pressing the start button.
 
 ## Apache proxy sketch
 

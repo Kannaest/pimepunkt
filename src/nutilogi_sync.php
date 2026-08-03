@@ -200,19 +200,19 @@ function nutilogi_game_is_locked(int $gameId): bool
     $stmt = db()->prepare("SELECT g.status, (SELECT COUNT(*) FROM teams t WHERE t.game_id=g.id) teams FROM games g WHERE g.id=?");
     $stmt->execute([$gameId]);
     $game = $stmt->fetch();
-    return !$game || !in_array($game['status'], ['draft', 'registration_open', 'waiting_start'], true) || (int)$game['teams'] > 0;
+    return !$game || !in_array($game['status'], ['draft', 'registration_open', 'waiting_start', 'running'], true) || (int)$game['teams'] > 0;
 }
 
 function nutilogi_write_game(array $event, int $adminId, ?int $gameId): int
 {
     $pdo = db();
     if ($gameId === null) {
-        $stmt = $pdo->prepare('INSERT INTO games (name,status,default_visit_points,default_wrong_penalty,auto_approve_teams,created_by_admin_id,public_results_enabled,allow_gpx_export,duration_minutes,speeding_penalty) VALUES (?,"waiting_start",3,2,1,?,1,1,360,7)');
+        $stmt = $pdo->prepare('INSERT INTO games (name,status,default_visit_points,default_wrong_penalty,auto_approve_teams,created_by_admin_id,public_results_enabled,allow_gpx_export,duration_minutes,speeding_penalty,started_at) VALUES (?,"running",3,2,1,?,1,1,360,7,NOW())');
         $stmt->execute([$event['event_name'], $adminId]);
         $gameId = (int)$pdo->lastInsertId();
         $pdo->prepare('INSERT IGNORE INTO game_admins (game_id,admin_id) VALUES (?,?)')->execute([$gameId, $adminId]);
     } else {
-        $pdo->prepare('UPDATE games SET name=?,status=IF(status IN ("draft","registration_open","waiting_start"),"waiting_start",status),auto_approve_teams=1,allow_gpx_export=1,duration_minutes=360,speeding_penalty=7 WHERE id=?')->execute([$event['event_name'], $gameId]);
+        $pdo->prepare('UPDATE games SET name=?,status=IF(status IN ("draft","registration_open","waiting_start"),"running",status),auto_approve_teams=1,allow_gpx_export=1,duration_minutes=360,speeding_penalty=7,started_at=COALESCE(started_at,NOW()) WHERE id=?')->execute([$event['event_name'], $gameId]);
         $pdo->prepare('DELETE FROM checkpoints WHERE game_id=?')->execute([$gameId]);
     }
 

@@ -26,4 +26,4 @@ php bin/import-nagemata-eesti.php /path/to/gpx /path/to/nagemata-eesti-oiged-vas
 php bin/import-nagemata-eesti.php /path/to/gpx /path/to/nagemata-eesti-oiged-vastused.md --apply
 ```
 
-The importer creates games in `waiting_start` state with automatic team approval enabled. It will not replace a game that already has submissions unless `--force` is explicitly supplied.
+The importer creates games in `running` state with automatic team approval and a six-hour per-team timer. A team's timer starts only when that team presses the start button. The importer will not replace a game that already has submissions unless `--force` is explicitly supplied.

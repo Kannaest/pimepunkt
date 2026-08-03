@@ -18,6 +18,7 @@ try {
     [$x, $y] = lest97_xy(59.437, 24.7536);
     assert_smoke(abs($x - 542763) < 5 && abs($y - 6589036) < 5, 'L-EST97 projection failed.');
     assert_smoke(parse_maxspeed('50') === 50 && parse_maxspeed('30 mph') === 48 && parse_maxspeed('signals') === null, 'maxspeed parsing failed.');
+    assert_smoke(format_elapsed_seconds(3661) === '01:01:01', 'Elapsed time formatting failed.');
     $centerLat = 58.5;
     $landscapeMap = generated_map_spec([
         'min_lat' => $centerLat,

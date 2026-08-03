@@ -6,6 +6,7 @@
         <small><?= e((string)($index + 1)) ?>. koht</small>
         <b><?= e($row['name']) ?></b>
         <span><?= e((string)$row['score']) ?> p</span>
+        <small>Aeg <?= e(format_elapsed_seconds($row['elapsed_seconds'])) ?></small>
       </div>
     <?php endforeach; ?>
   </div>
@@ -14,7 +15,7 @@
       <div class="score-card <?= $index === 0 ? 'winner' : '' ?>">
         <b><?= $index === 0 ? 'Võitja: ' : '' ?><?= e($row['name']) ?></b>
         <span><?= e((string)$row['score']) ?> p</span>
-        <small><?= e((string)$row['visited']) ?> kohal · <?= e((string)$row['correct_count']) ?> õige · <?= e((string)$row['wrong_count']) ?> vale</small>
+        <small><?= e((string)$row['visited']) ?> kohal · <?= e((string)$row['correct_count']) ?> õige · <?= e((string)$row['wrong_count']) ?> vale · aeg <?= e(format_elapsed_seconds($row['elapsed_seconds'])) ?></small>
       </div>
     <?php endforeach; ?>
   </div>

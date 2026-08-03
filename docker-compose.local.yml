@@ -5,6 +5,7 @@ services:
 
 networks:
   kanna_default:
-    external: false
+    external: true
+    name: kanna_default
   pimepunkt_local:
     driver: bridge

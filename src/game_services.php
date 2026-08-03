@@ -13,6 +13,12 @@ function game_bounds(int $gameId): ?array
     return array_map('floatval', $row);
 }
 
+function game_overview_bounds(int $gameId): ?array
+{
+    $bounds = game_bounds($gameId);
+    return $bounds ? generated_map_bounds($bounds, 1, 1) : null;
+}
+
 function http_request(string $url, ?string $body = null, int $timeout = 60): string
 {
     $headers = "User-Agent: Pimepunkt/1.0 (https://kand.ee/pimepunkt)\r\n";

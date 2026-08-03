@@ -34,9 +34,9 @@ try {
     $questions[] = create_checkpoint_with_question($pdo, $resultsGameId, '2', 'Tulemuste punkt 2', 58.3868000, 24.5000000, 75, 'ok', 'Kohal käimise testpunkt', [], 0);
     $questions[] = create_checkpoint_with_question($pdo, $resultsGameId, '3', 'Tulemuste punkt 3', 58.3893000, 24.5034000, 75, 'choice', 'Testküsimus 3', ['Vale', 'Õige', 'Vale'], 1);
 
-    $blueTeam = create_team($pdo, $resultsGameId, 'Sinine tiim', 'sinine-test@example.test');
-    $pinkTeam = create_team($pdo, $resultsGameId, 'Roosa tiim', 'roosa-test@example.test');
-    $yellowTeam = create_team($pdo, $resultsGameId, 'Kollane tiim', 'kollane-test@example.test');
+    $blueTeam = create_team($pdo, $resultsGameId, 'Sinine tiim', 'sinine-test@example.test', 165);
+    $pinkTeam = create_team($pdo, $resultsGameId, 'Roosa tiim', 'roosa-test@example.test', 184);
+    $yellowTeam = create_team($pdo, $resultsGameId, 'Kollane tiim', 'kollane-test@example.test', 201);
 
     submit_answer($pdo, $blueTeam, $questions[0], true, 58.38591, 24.49711);
     submit_answer($pdo, $blueTeam, $questions[1], true, 58.38681, 24.50001);
@@ -103,10 +103,10 @@ function create_checkpoint_with_question(PDO $pdo, int $gameId, string $number, 
     ];
 }
 
-function create_team(PDO $pdo, int $gameId, string $name, string $email): int
+function create_team(PDO $pdo, int $gameId, string $name, string $email, int $elapsedMinutes = 0): int
 {
-    $stmt = $pdo->prepare('INSERT INTO teams (game_id, name, email, status, email_verified_at) VALUES (?, ?, ?, "approved", NOW())');
-    $stmt->execute([$gameId, $name, $email]);
+    $stmt = $pdo->prepare('INSERT INTO teams (game_id, name, email, status, email_verified_at, play_started_at) VALUES (?, ?, ?, "approved", NOW(), IF(? > 0, DATE_SUB(NOW(), INTERVAL ? MINUTE), NULL))');
+    $stmt->execute([$gameId, $name, $email, $elapsedMinutes, $elapsedMinutes]);
     return (int)$pdo->lastInsertId();
 }
 

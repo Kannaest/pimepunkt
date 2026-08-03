@@ -33,9 +33,9 @@ foreach (['Kruus' => '%kruus%', 'Asfalt' => '%asfalt%'] as $kind => $pattern) {
             $played->execute([$gameId]);
             if ((int)$played->fetchColumn() > 0) throw new RuntimeException($name . ' already has submissions.');
             $pdo->prepare('DELETE FROM checkpoints WHERE game_id = ?')->execute([$gameId]);
-            $pdo->prepare('UPDATE games SET status="waiting_start", auto_approve_teams=1, allow_gpx_export=1, duration_minutes=360, speeding_penalty=7 WHERE id=?')->execute([$gameId]);
+            $pdo->prepare('UPDATE games SET status="running", auto_approve_teams=1, allow_gpx_export=1, duration_minutes=360, speeding_penalty=7, started_at=COALESCE(started_at,NOW()) WHERE id=?')->execute([$gameId]);
         } else {
-            $insert = $pdo->prepare('INSERT INTO games (name,status,default_visit_points,default_wrong_penalty,auto_approve_teams,created_by_admin_id,public_results_enabled,allow_gpx_export,duration_minutes,speeding_penalty) VALUES (?,"waiting_start",3,2,1,?,1,1,360,7)');
+            $insert = $pdo->prepare('INSERT INTO games (name,status,default_visit_points,default_wrong_penalty,auto_approve_teams,created_by_admin_id,public_results_enabled,allow_gpx_export,duration_minutes,speeding_penalty,started_at) VALUES (?,"running",3,2,1,?,1,1,360,7,NOW())');
             $insert->execute([$name, (int)$admin['id']]);
             $gameId = (int)$pdo->lastInsertId();
         }
