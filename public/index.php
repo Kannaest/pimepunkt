@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 require __DIR__ . '/../src/bootstrap.php';
 require __DIR__ . '/../src/game_services.php';
+require __DIR__ . '/../src/nutilogi_sync.php';
 
 start_session();
 send_security_headers();
@@ -287,8 +288,26 @@ function admin_dispatch(string $method, string $route): void
     if ($method === 'GET' && $route === '/admin') {
         $games = accessible_games($admin);
         $admins = (int)$admin['is_super'] === 1 ? db()->query('SELECT * FROM admins ORDER BY email')->fetchAll() : [];
-        render('admin_games', ['games' => $games, 'admin' => $admin, 'admins' => $admins]);
+        $nutilogi = (int)$admin['is_super'] === 1 ? nutilogi_sync_status() : null;
+        render('admin_games', ['games' => $games, 'admin' => $admin, 'admins' => $admins, 'nutilogi' => $nutilogi]);
         return;
+    }
+    if ($method === 'POST' && $route === '/admin/nutilogi-sync') {
+        require_csrf();
+        if ((int)$admin['is_super'] !== 1) {
+            http_response_code(403);
+            render('error', ['message' => 'Ainult peadmin saab Nutilogi mänge sünkroonida.']);
+            return;
+        }
+        try {
+            $apply = (string)($_POST['apply'] ?? '') === '1';
+            $result = nutilogi_sync_latest((int)$admin['id'], $apply);
+            flash(nutilogi_sync_message($result, $apply));
+        } catch (Throwable $exception) {
+            error_log($exception);
+            flash('Nutilogi sünkroonimine ebaõnnestus: ' . $exception->getMessage());
+        }
+        redirect_to('/admin');
     }
     if ($method === 'POST' && $route === '/admin/games') {
         require_csrf();

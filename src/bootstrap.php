@@ -50,6 +50,9 @@ function config(): array
             'smtp_password' => env_value('SMTP_PASSWORD', ''),
             'smtp_secure' => env_value('SMTP_SECURE', 'tls'),
         ],
+        'nutilogi' => [
+            'firebase_api_key' => env_value('NUTILOGI_FIREBASE_API_KEY', 'AIzaSyDIGG0DLBM_HOzM9gubl9ckeYZT05slo58'),
+        ],
     ];
 
     return $config;

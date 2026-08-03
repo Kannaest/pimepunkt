@@ -35,6 +35,28 @@
 </section>
 
 <?php if ((int)$admin['is_super'] === 1): ?>
+  <section class="panel">
+    <div class="section-head">
+      <div>
+        <h2>Nutilogi Nägemata Eesti</h2>
+        <small>
+          Seotud <?= e((string)($nutilogi['linked_games'] ?? 0)) ?> mängu
+          <?= !empty($nutilogi['last_synced_at']) ? ' · viimane sünkroon ' . e((string)$nutilogi['last_synced_at']) : '' ?>
+        </small>
+      </div>
+      <div class="actions">
+        <form method="post" action="<?= e(path('/admin/nutilogi-sync')) ?>">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <button class="button">Kontrolli uuendusi</button>
+        </form>
+        <form method="post" action="<?= e(path('/admin/nutilogi-sync')) ?>" onsubmit="return confirm('Sünkroonin 20 viimast avaldatud Nägemata Eesti mängu? Aktiivseid ja mängitud mänge ei muudeta.')">
+          <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
+          <input type="hidden" name="apply" value="1">
+          <button class="button primary">Sünkrooni</button>
+        </form>
+      </div>
+    </div>
+  </section>
   <section class="grid two">
     <div class="panel">
       <h2>Adminid</h2>

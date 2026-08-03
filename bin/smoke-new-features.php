@@ -5,6 +5,7 @@ declare(strict_types=1);
 if (PHP_SAPI !== 'cli') exit(1);
 require __DIR__ . '/../src/bootstrap.php';
 require __DIR__ . '/../src/game_services.php';
+require __DIR__ . '/../src/nutilogi_sync.php';
 
 function assert_smoke(bool $condition, string $message): void
 {
@@ -32,6 +33,17 @@ try {
     ]);
     assert_smoke($landscapeMap['orientation'] === 'landscape' && $landscapeMap['width'] > 5600 && $landscapeMap['height'] > 4000, 'Landscape map sizing failed.');
     assert_smoke($portraitMap['orientation'] === 'portrait' && $portraitMap['height'] > 5600 && $portraitMap['width'] > 4000, 'Portrait map sizing failed.');
+    $nutilogiEvent = nutilogi_normalize_event(
+        ['id' => 'NE-test', 'name' => 'NE test', 'starttime' => 1000, 'endtime' => 2000],
+        [
+            'kp' => ['a' => ['nr' => '1', 'ra' => 6]],
+            'kpdata' => ['a' => ['loc' => ['lat' => 58.5, 'lng' => 24.5], 'desc' => '<b>Küsimus</b>', 'responses' => ['x' => 'Vale', 'y' => 'Õige']]],
+            'kpanswer' => ['a' => 'y'],
+        ]
+    );
+    assert_smoke(count($nutilogiEvent['points']) === 1, 'Nutilogi point parsing failed.');
+    assert_smoke($nutilogiEvent['points'][0]['difficulty'] === 6 && $nutilogiEvent['points'][0]['options'][1]['correct'] === true, 'Nutilogi difficulty or answer parsing failed.');
+    assert_smoke(strlen($nutilogiEvent['source_hash']) === 64, 'Nutilogi source hash failed.');
 
     $pdo->exec('INSERT INTO games (name,status,default_visit_points,default_wrong_penalty,duration_minutes,speeding_penalty) VALUES ("Smoke game","running",3,2,360,7)');
     $gameId = (int)$pdo->lastInsertId();
