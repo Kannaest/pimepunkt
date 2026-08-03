@@ -10,7 +10,10 @@ $ids = [];
 foreach (array_slice($argv, 1) as $argument) {
     if (ctype_digit($argument)) $ids[] = (int)$argument;
 }
-if (!$ids) {
+$allGenerated = in_array('--all-generated', $argv, true);
+if (!$ids && $allGenerated) {
+    $ids = array_map('intval', db()->query("SELECT id FROM games WHERE map_path LIKE '/uploads/maps/game-%-generated-%.png' ORDER BY id")->fetchAll(PDO::FETCH_COLUMN));
+} elseif (!$ids) {
     $ids = array_map('intval', db()->query('SELECT DISTINCT g.id FROM games g JOIN audit_log a ON a.game_id = g.id WHERE a.action IN ("nagemata_eesti_import", "nagemata_eesti_total_created") ORDER BY g.id')->fetchAll(PDO::FETCH_COLUMN));
 }
 if (!$ids) {

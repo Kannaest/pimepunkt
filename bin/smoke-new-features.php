@@ -17,6 +17,21 @@ try {
     [$x, $y] = lest97_xy(59.437, 24.7536);
     assert_smoke(abs($x - 542763) < 5 && abs($y - 6589036) < 5, 'L-EST97 projection failed.');
     assert_smoke(parse_maxspeed('50') === 50 && parse_maxspeed('30 mph') === 48 && parse_maxspeed('signals') === null, 'maxspeed parsing failed.');
+    $centerLat = 58.5;
+    $landscapeMap = generated_map_spec([
+        'min_lat' => $centerLat,
+        'max_lat' => $centerLat + 25000 / 111320,
+        'min_lng' => 24.0,
+        'max_lng' => 24.0 + 35000 / (111320 * cos(deg2rad($centerLat))),
+    ]);
+    $portraitMap = generated_map_spec([
+        'min_lat' => $centerLat,
+        'max_lat' => $centerLat + 35000 / 111320,
+        'min_lng' => 24.0,
+        'max_lng' => 24.0 + 25000 / (111320 * cos(deg2rad($centerLat))),
+    ]);
+    assert_smoke($landscapeMap['orientation'] === 'landscape' && $landscapeMap['width'] > 5600 && $landscapeMap['height'] > 4000, 'Landscape map sizing failed.');
+    assert_smoke($portraitMap['orientation'] === 'portrait' && $portraitMap['height'] > 5600 && $portraitMap['width'] > 4000, 'Portrait map sizing failed.');
 
     $pdo->exec('INSERT INTO games (name,status,default_visit_points,default_wrong_penalty,duration_minutes,speeding_penalty) VALUES ("Smoke game","running",3,2,360,7)');
     $gameId = (int)$pdo->lastInsertId();

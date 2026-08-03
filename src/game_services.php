@@ -41,9 +41,14 @@ function generated_map_bounds(array $bounds, int $width = 3200, int $height = 20
     $latMeters = max(1.0, ($bounds['max_lat'] - $bounds['min_lat']) * 111320);
     $lngMeters = max(1.0, ($bounds['max_lng'] - $bounds['min_lng']) * 111320 * cos(deg2rad($centerLat)));
 
-    // Prefer the game's extent; keep a useful overview for very compact games.
-    $targetWidth = max(8000.0, $lngMeters * 1.18);
-    $targetHeight = max($targetWidth * $height / $width, $latMeters * 1.18);
+    $targetWidth = $lngMeters * 1.12;
+    $targetHeight = $latMeters * 1.12;
+    if (max($targetWidth, $targetHeight) < 8000) {
+        $factor = 8000 / max($targetWidth, $targetHeight);
+        $targetWidth *= $factor;
+        $targetHeight *= $factor;
+    }
+    $targetHeight = max($targetWidth * $height / $width, $targetHeight);
     $targetWidth = max($targetWidth, $targetHeight * $width / $height);
 
     $halfLat = ($targetHeight / 111320) / 2;
@@ -53,6 +58,44 @@ function generated_map_bounds(array $bounds, int $width = 3200, int $height = 20
         'max_lat' => $centerLat + $halfLat,
         'min_lng' => $centerLng - $halfLng,
         'max_lng' => $centerLng + $halfLng,
+    ];
+}
+
+function generated_map_spec(array $bounds): array
+{
+    $centerLat = ($bounds['min_lat'] + $bounds['max_lat']) / 2;
+    $latMeters = max(1.0, ($bounds['max_lat'] - $bounds['min_lat']) * 111320);
+    $lngMeters = max(1.0, ($bounds['max_lng'] - $bounds['min_lng']) * 111320 * cos(deg2rad($centerLat)));
+    $mapWidthMeters = $lngMeters * 1.12;
+    $mapHeightMeters = $latMeters * 1.12;
+
+    // Keep compact and nearly linear games usable while retaining the area's orientation.
+    if ($mapWidthMeters / $mapHeightMeters < 0.5) {
+        $mapWidthMeters = $mapHeightMeters * 0.5;
+    } elseif ($mapWidthMeters / $mapHeightMeters > 2.0) {
+        $mapHeightMeters = $mapWidthMeters / 2.0;
+    }
+    if (max($mapWidthMeters, $mapHeightMeters) < 8000) {
+        $factor = 8000 / max($mapWidthMeters, $mapHeightMeters);
+        $mapWidthMeters *= $factor;
+        $mapHeightMeters *= $factor;
+    }
+
+    $pixelsPerMeter = 300 * 39.37007874 / 80000;
+    $width = $mapWidthMeters * $pixelsPerMeter;
+    $height = $mapHeightMeters * $pixelsPerMeter;
+    $factor = max(2400 / max($width, $height), 1.0);
+    $width *= $factor;
+    $height *= $factor;
+    $factor = min(1.0, 7200 / max($width, $height), sqrt(24000000 / ($width * $height)));
+    $width = max(1200, (int)round($width * $factor));
+    $height = max(1200, (int)round($height * $factor));
+
+    return [
+        'width' => $width,
+        'height' => $height,
+        'orientation' => $width >= $height ? 'landscape' : 'portrait',
+        'bounds' => generated_map_bounds($bounds, $width, $height),
     ];
 }
 
@@ -83,13 +126,15 @@ function generate_player_map(int $gameId): string
     if (!extension_loaded('gd')) {
         throw new RuntimeException('Kaardi genereerimiseks puudub GD laiendus. Ehita Docker image uuesti.');
     }
+    ini_set('memory_limit', '384M');
     $bounds = game_bounds($gameId);
     if (!$bounds) {
         throw new RuntimeException('Mängul ei ole kaardi genereerimiseks punkte.');
     }
-    $width = 3200;
-    $height = 2000;
-    $mapBounds = generated_map_bounds($bounds, $width, $height);
+    $mapSpec = generated_map_spec($bounds);
+    $width = $mapSpec['width'];
+    $height = $mapSpec['height'];
+    $mapBounds = $mapSpec['bounds'];
     $projectedCorners = [
         lest97_xy($mapBounds['min_lat'], $mapBounds['min_lng']),
         lest97_xy($mapBounds['min_lat'], $mapBounds['max_lng']),
@@ -99,21 +144,35 @@ function generate_player_map(int $gameId): string
     $xs = array_column($projectedCorners, 0);
     $ys = array_column($projectedCorners, 1);
     $projectedBounds = ['min_x' => min($xs), 'max_x' => max($xs), 'min_y' => min($ys), 'max_y' => max($ys)];
-    $bbox = implode(',', [$projectedBounds['min_x'], $projectedBounds['min_y'], $projectedBounds['max_x'], $projectedBounds['max_y']]);
-    $url = 'https://kaart.maaamet.ee/wms/hallkaart?' . http_build_query([
-        'SERVICE' => 'WMS', 'VERSION' => '1.1.1', 'REQUEST' => 'GetMap',
-        'LAYERS' => 'kaart_ht', 'STYLES' => '', 'SRS' => 'EPSG:3301',
-        'BBOX' => $bbox, 'WIDTH' => $width, 'HEIGHT' => $height,
-        'FORMAT' => 'image/png', 'TRANSPARENT' => 'FALSE',
-    ]);
-    $image = @imagecreatefromstring(http_request($url, null, 90));
-    if (!$image) {
-        throw new RuntimeException('Hallkaardi pilti ei saanud avada.');
-    }
-    if (!imageistruecolor($image)) {
-        imagepalettetotruecolor($image);
+    $image = imagecreatetruecolor($width, $height);
+    imagefill($image, 0, 0, imagecolorallocate($image, 255, 255, 255));
+    $tileSize = 1800;
+    for ($top = 0; $top < $height; $top += $tileSize) {
+        for ($left = 0; $left < $width; $left += $tileSize) {
+            $tileWidth = min($tileSize, $width - $left);
+            $tileHeight = min($tileSize, $height - $top);
+            $minX = $projectedBounds['min_x'] + $left / $width * ($projectedBounds['max_x'] - $projectedBounds['min_x']);
+            $maxX = $projectedBounds['min_x'] + ($left + $tileWidth) / $width * ($projectedBounds['max_x'] - $projectedBounds['min_x']);
+            $maxY = $projectedBounds['max_y'] - $top / $height * ($projectedBounds['max_y'] - $projectedBounds['min_y']);
+            $minY = $projectedBounds['max_y'] - ($top + $tileHeight) / $height * ($projectedBounds['max_y'] - $projectedBounds['min_y']);
+            $url = 'https://kaart.maaamet.ee/wms/hallkaart?' . http_build_query([
+                'SERVICE' => 'WMS', 'VERSION' => '1.1.1', 'REQUEST' => 'GetMap',
+                'LAYERS' => 'kaart_ht', 'STYLES' => '', 'SRS' => 'EPSG:3301',
+                'BBOX' => implode(',', [$minX, $minY, $maxX, $maxY]),
+                'WIDTH' => $tileWidth, 'HEIGHT' => $tileHeight,
+                'FORMAT' => 'image/png', 'TRANSPARENT' => 'FALSE',
+            ]);
+            $tile = @imagecreatefromstring(http_request($url, null, 90));
+            if (!$tile) {
+                imagedestroy($image);
+                throw new RuntimeException('Hallkaardi pilti ei saanud avada.');
+            }
+            imagecopy($image, $tile, $left, $top, 0, 0, $tileWidth, $tileHeight);
+            imagedestroy($tile);
+        }
     }
     imagealphablending($image, true);
+    imageresolution($image, 300, 300);
 
     $stmt = db()->prepare('SELECT number, lat, lng, difficulty FROM checkpoints WHERE game_id = ? ORDER BY number');
     $stmt->execute([$gameId]);
@@ -123,14 +182,17 @@ function generate_player_map(int $gameId): string
     $white = imagecolorallocatealpha($image, 255, 255, 255, 18);
     $dark = imagecolorallocatealpha($image, 37, 37, 37, 5);
     $font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
+    $markerScale = max(1.0, min(1.7, max($width, $height) / 3200));
+    $markerRadius = $denseMap ? (int)round(8 * $markerScale) : (int)round(20 * $markerScale);
+    $fontSize = (int)round(18 * $markerScale);
     foreach ($points as $point) {
         [$pointX, $pointY] = lest97_xy((float)$point['lat'], (float)$point['lng']);
         $x = (int)round(($pointX - $projectedBounds['min_x']) / ($projectedBounds['max_x'] - $projectedBounds['min_x']) * $width);
         $y = (int)round(($projectedBounds['max_y'] - $pointY) / ($projectedBounds['max_y'] - $projectedBounds['min_y']) * $height);
-        draw_map_checkpoint($image, $x, $y, checkpoint_difficulty($point['difficulty'] ?? 1), $pink, $white, $dark, $denseMap ? 8 : 20);
+        draw_map_checkpoint($image, $x, $y, checkpoint_difficulty($point['difficulty'] ?? 1), $pink, $white, $dark, $markerRadius);
         if (!$denseMap) {
             if (is_file($font)) {
-                imagettftext($image, 18, 0, $x + 25, $y - 18, $dark, $font, (string)$point['number']);
+                imagettftext($image, $fontSize, 0, $x + $markerRadius + 5, $y - $markerRadius + 2, $dark, $font, (string)$point['number']);
             } else {
                 imagestring($image, 5, $x + 23, $y - 25, (string)$point['number'], $dark);
             }
