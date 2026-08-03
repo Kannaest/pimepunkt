@@ -589,6 +589,31 @@ textarea { min-height: 92px; resize: vertical; }
   border-color: transparent;
   background: #eef4ee;
 }
+.gps-telemetry {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.gps-telemetry > div {
+  display: grid;
+  align-content: center;
+  min-height: 64px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #fff;
+}
+.gps-telemetry small, .gps-telemetry span { color: var(--muted); }
+.gps-telemetry b { font-variant-numeric: tabular-nums; }
+.gps-telemetry [data-speed-state].over-limit {
+  border-color: #c62828;
+  background: #fde8e5;
+  color: #a71919;
+}
+.gps-telemetry [data-speed-state].over-limit small { color: #a71919; }
+.location-controls { display: grid; gap: 8px; }
+.location-controls p { margin: 0; }
 .gps-warning {
   margin: 12px 0;
   padding: 12px 14px;
@@ -736,4 +761,44 @@ textarea { min-height: 92px; resize: vertical; }
   .timeline-labels b, .timeline-labels span:last-child { text-align: left; }
   .map-shell { height: calc(100vh - 128px); }
   .game-clock { position: sticky; top: 58px; z-index: 700; }
+}
+
+@media (orientation: landscape) and (max-height: 600px) {
+  .shell { width: min(100% - 16px, 1120px); margin-top: 8px; }
+  .game-clock { min-height: 44px; margin-bottom: 8px; padding: 6px 10px; }
+  .game-clock b { font-size: 18px; }
+  #tab-questions > .panel {
+    display: grid;
+    grid-template-columns: minmax(230px, 34%) minmax(0, 1fr);
+    gap: 12px;
+    padding: 10px;
+  }
+  .questions-overview { min-width: 0; }
+  .questions-overview h1 { margin: 0 0 6px; font-size: 20px; }
+  .questions-overview .progress-card { margin-bottom: 7px; padding: 7px 9px; }
+  .questions-overview .progress-card b { font-size: 17px; }
+  .questions-overview .progress-card span { display: none; }
+  .questions-overview .gps-telemetry { gap: 5px; margin-bottom: 7px; }
+  .questions-overview .gps-telemetry > div { min-height: 48px; padding: 5px 6px; }
+  .questions-overview .gps-telemetry b { font-size: 13px; }
+  .questions-overview .gps-telemetry small,
+  .questions-overview .gps-telemetry span { font-size: 11px; }
+  .questions-overview .location-controls { gap: 5px; }
+  .questions-overview .location-controls p,
+  .questions-overview .location-controls > small { font-size: 11px; line-height: 1.25; }
+  .questions-overview .location-controls .actions { gap: 5px; }
+  .questions-overview .location-controls .button { min-height: 34px; padding: 5px 8px; font-size: 12px; }
+  .questions-overview .gps-warning { margin: 6px 0; padding: 7px 9px; font-size: 12px; }
+  #tab-questions .question-list {
+    align-content: start;
+    max-height: calc(100vh - 125px);
+    margin-top: 0;
+    padding-bottom: 64px;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  #tab-questions .question-row { gap: 7px; padding: 9px; }
+  #tab-questions .question-summary { gap: 7px; }
+  #tab-questions .question-summary small { font-size: 12px; }
+  .game-tabs { bottom: 6px; width: min(340px, calc(100% - 20px)); padding: 4px; }
 }

@@ -53,18 +53,29 @@
       $totalQuestions = (int)$progress['total_count'];
       $answeredQuestions = (int)$progress['answered_count'];
     ?>
-    <h1>Küsimused</h1>
-    <div class="progress-card <?= $totalQuestions > 0 && $answeredQuestions === $totalQuestions ? 'complete' : '' ?>">
-      <b><?= e((string)$answeredQuestions) ?>/<?= e((string)$totalQuestions) ?> tehtud</b>
-      <span><?= $totalQuestions > 0 && $answeredQuestions === $totalQuestions ? 'Mäng edukalt läbitud. Aitäh!' : 'Ava lähim sobiv punkt ja vasta siis, kui oled alas.' ?></span>
+    <div class="questions-overview">
+      <h1>Küsimused</h1>
+      <div class="progress-card <?= $totalQuestions > 0 && $answeredQuestions === $totalQuestions ? 'complete' : '' ?>">
+        <b><?= e((string)$answeredQuestions) ?>/<?= e((string)$totalQuestions) ?> tehtud</b>
+        <span><?= $totalQuestions > 0 && $answeredQuestions === $totalQuestions ? 'Mäng edukalt läbitud. Aitäh!' : 'Ava lähim sobiv punkt ja vasta siis, kui oled alas.' ?></span>
+      </div>
+      <div class="gps-telemetry" aria-live="polite">
+        <div data-speed-state><small>Kiirus</small><b data-current-speed>— km/h</b></div>
+        <div><small>Asukoht</small><b data-location-age>Ootan GPS-i</b></div>
+        <div><small>Piirang</small><b data-speed-limit>—</b><span data-speeding-duration hidden></span></div>
+      </div>
+      <div class="gps-warning" data-gps-warning hidden></div>
+      <div class="location-controls">
+        <p class="muted" id="gps-status">Asukohta kasutatakse küsimuste sorteerimiseks ja vastamiseks.</p>
+        <div class="actions">
+          <button class="button" data-refresh-location>Uuenda asukohta</button>
+          <?php if ($questionsLimited): ?><button class="button" data-refresh-nearest>Leia uuesti lähimad</button><?php endif; ?>
+        </div>
+        <?php if ($questionsLimited): ?>
+          <small class="muted">Kuvatakse kuni 60 lähimat vastamata punkti<?= $hasLocationForQuestions ? ' viimase asukoha järgi' : '. Esimesel korral luba GPS ja uuenda nimekirja' ?>.</small>
+        <?php endif; ?>
+      </div>
     </div>
-    <div class="gps-warning" data-gps-warning hidden></div>
-    <p class="muted" id="gps-status">Asukohta kasutatakse küsimuste sorteerimiseks ja vastamiseks.</p>
-    <button class="button" data-refresh-location>Uuenda asukohta</button>
-    <?php if ($questionsLimited): ?>
-      <button class="button" data-refresh-nearest>Leia uuesti lähimad punktid</button>
-      <p class="muted">Kuvatakse kuni 60 lähimat vastamata punkti<?= $hasLocationForQuestions ? ' viimase asukoha järgi' : '. Esimesel korral luba GPS ja vajuta „Leia uuesti lähimad punktid“' ?>.</p>
-    <?php endif; ?>
     <div class="question-list" data-question-list>
       <?php foreach ($checkpoints as $cp): ?>
         <form class="question-row" method="post" action="<?= e(path('/answer')) ?>" data-lat="<?= e((string)$cp['lat']) ?>" data-lng="<?= e((string)$cp['lng']) ?>" data-radius="<?= e((string)$cp['radius_m']) ?>">

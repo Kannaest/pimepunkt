@@ -144,6 +144,8 @@
       var lat = pos.coords.latitude;
       var lng = pos.coords.longitude;
       var accuracy = pos.coords.accuracy || '';
+      lastLocationAt = Date.now();
+      renderTelemetryClock();
       hideGpsWarning();
       if (status) status.textContent = 'Asukoht uuendatud. Täpsus umbes ' + Math.round(accuracy) + ' m.';
       rows.forEach(function (row) {
@@ -161,8 +163,9 @@
       var list = qs('[data-question-list]');
       rows.sort(function (a, b) { return parseFloat(a.dataset.distance) - parseFloat(b.dataset.distance); })
         .forEach(function (row) { list.appendChild(row); });
-      logLocation(lat, lng, accuracy).then(function (saved) {
-        if (typeof onComplete === 'function') onComplete(saved);
+      logLocation(lat, lng, accuracy).then(function (telemetry) {
+        renderSpeedTelemetry(telemetry);
+        if (typeof onComplete === 'function') onComplete(Boolean(telemetry));
       });
     }, function (error) {
       showGpsWarning(gpsErrorMessage(error));
@@ -200,14 +203,63 @@
   }
 
   function logLocation(lat, lng, accuracy) {
-    if (!window.PIMEPUNKT) return Promise.resolve(false);
+    if (!window.PIMEPUNKT) return Promise.resolve(null);
     return fetch(window.PIMEPUNKT.basePath + '/location', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lat: lat, lng: lng, accuracy: accuracy })
     }).then(function (response) {
-      return response.ok;
-    }).catch(function () { return false; });
+      if (!response.ok || response.status === 204) return null;
+      return response.json().catch(function () { return null; });
+    }).catch(function () { return null; });
+  }
+
+  var lastLocationAt = null;
+  var speedingSince = null;
+  var speedState = qs('[data-speed-state]');
+  var speedValue = qs('[data-current-speed]');
+  var speedLimit = qs('[data-speed-limit]');
+  var locationAge = qs('[data-location-age]');
+  var speedingDuration = qs('[data-speeding-duration]');
+
+  function renderSpeedTelemetry(data) {
+    if (!data || data.ignored === 'too_frequent') return;
+    if (speedValue) {
+      speedValue.textContent = typeof data.speed === 'number' ? Math.round(data.speed) + ' km/h' : '— km/h';
+    }
+    if (speedLimit) {
+      speedLimit.textContent = typeof data.limit === 'number' ? data.limit + ' km/h' : 'Puudub';
+    }
+    if (data.speeding) {
+      speedingSince = Date.now() - Math.max(0, Number(data.speeding_seconds) || 0) * 1000;
+    } else {
+      speedingSince = null;
+    }
+    if (speedState) speedState.classList.toggle('over-limit', Boolean(data.speeding));
+    renderTelemetryClock();
+  }
+
+  function renderTelemetryClock() {
+    if (locationAge) {
+      locationAge.textContent = lastLocationAt === null
+        ? 'Ootan GPS-i'
+        : Math.max(0, Math.floor((Date.now() - lastLocationAt) / 1000)) + ' s tagasi';
+    }
+    if (speedingDuration) {
+      if (speedingSince === null) {
+        speedingDuration.hidden = true;
+        speedingDuration.textContent = '';
+      } else {
+        var seconds = Math.max(0, Math.floor((Date.now() - speedingSince) / 1000));
+        speedingDuration.hidden = false;
+        speedingDuration.textContent = seconds > 10 ? 'Ületus ' + seconds + ' s · karistus' : 'Ületus ' + seconds + ' / 10 s';
+      }
+    }
+  }
+
+  if (locationAge) {
+    renderTelemetryClock();
+    setInterval(renderTelemetryClock, 1000);
   }
 
   var refresh = qs('[data-refresh-location]');

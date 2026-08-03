@@ -509,11 +509,17 @@ function record_location_and_speed(array $team, float $lat, float $lng, float $a
     $limit = $zone ? (int)$zone['speed_limit_kmh'] : null;
     db()->prepare('INSERT INTO location_logs (team_id, lat, lng, accuracy_m, filtered_speed_kmh, speed_limit_kmh, ignored_reason) VALUES (?, ?, ?, ?, ?, ?, ?)')
         ->execute([(int)$team['id'], $lat, $lng, $accuracy, $speed, $limit, $ignored]);
-    update_speeding_event($team, $zone, $speed);
-    return ['speed' => $speed, 'limit' => $limit, 'ignored' => $ignored];
+    $speeding = update_speeding_event($team, $zone, $speed);
+    return [
+        'speed' => $speed,
+        'limit' => $limit,
+        'ignored' => $ignored,
+        'speeding' => $speeding['active'],
+        'speeding_seconds' => $speeding['seconds'],
+    ];
 }
 
-function update_speeding_event(array $team, ?array $zone, ?float $speed): void
+function update_speeding_event(array $team, ?array $zone, ?float $speed): array
 {
     $stmt = db()->prepare('SELECT * FROM speeding_events WHERE team_id = ? AND ended_at IS NULL ORDER BY id DESC LIMIT 1');
     $stmt->execute([(int)$team['id']]);
@@ -521,13 +527,13 @@ function update_speeding_event(array $team, ?array $zone, ?float $speed): void
     $isSpeeding = $zone && $speed !== null && $speed > (int)$zone['speed_limit_kmh'] * 1.10;
     if (!$isSpeeding) {
         if ($open) db()->prepare('UPDATE speeding_events SET ended_at = NOW() WHERE id = ?')->execute([(int)$open['id']]);
-        return;
+        return ['active' => false, 'seconds' => 0];
     }
     if (!$open || (int)$open['speed_zone_id'] !== (int)$zone['id']) {
         if ($open) db()->prepare('UPDATE speeding_events SET ended_at = NOW() WHERE id = ?')->execute([(int)$open['id']]);
         db()->prepare('INSERT INTO speeding_events (team_id, speed_zone_id, started_at, max_speed_kmh, limit_kmh) VALUES (?, ?, NOW(), ?, ?)')
             ->execute([(int)$team['id'], (int)$zone['id'], $speed, (int)$zone['speed_limit_kmh']]);
-        return;
+        return ['active' => true, 'seconds' => 0];
     }
     $durationStmt = db()->prepare('SELECT TIMESTAMPDIFF(SECOND, started_at, NOW()) FROM speeding_events WHERE id = ?');
     $durationStmt->execute([(int)$open['id']]);
@@ -538,6 +544,7 @@ function update_speeding_event(array $team, ?array $zone, ?float $speed): void
     $status = $seconds > 10 ? 'confirmed' : 'pending';
     db()->prepare('UPDATE speeding_events SET max_speed_kmh = GREATEST(max_speed_kmh, ?), penalty_points = ?, status = ? WHERE id = ?')
         ->execute([$speed, $penalty, $status, (int)$open['id']]);
+    return ['active' => true, 'seconds' => $seconds];
 }
 
 function team_deadline(array $team, array $game): ?DateTimeImmutable

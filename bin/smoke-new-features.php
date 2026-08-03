@@ -68,6 +68,7 @@ try {
     $secondResult = record_location_and_speed($team, 58.385, 24.503, 5);
     $event = $pdo->query('SELECT status,penalty_points FROM speeding_events WHERE team_id=' . $teamId)->fetch();
     assert_smoke($event && $event['status'] === 'confirmed' && (int)$event['penalty_points'] === 7, 'Speeding duration or penalty failed: ' . json_encode([$firstResult, $secondResult, $event]));
+    assert_smoke($firstResult['speeding'] === true && $secondResult['speeding'] === true && (int)$secondResult['speeding_seconds'] >= 10, 'Speeding telemetry failed.');
     assert_smoke(str_contains(game_gpx($gameId), '<wpt lat="58.3850000" lon="24.5000000">'), 'GPX export failed.');
 
     $pdo->rollBack();
