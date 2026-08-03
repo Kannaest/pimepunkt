@@ -258,6 +258,21 @@ textarea { min-height: 92px; resize: vertical; }
 .map-toolbar label {
   min-width: 130px;
 }
+.span-two { grid-column: 1 / -1; }
+.checkpoint-search {
+  margin-bottom: 14px;
+}
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 14px 0;
+}
+.pagination span {
+  color: var(--muted);
+  font-weight: 700;
+}
 .leaflet-map {
   height: 420px;
   min-height: 320px;

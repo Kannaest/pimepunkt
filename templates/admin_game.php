@@ -59,7 +59,7 @@
     <form method="post" action="<?= e(path('/admin/games/' . $game['id'] . '/map-generate')) ?>">
       <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
       <button class="button">Genereeri halltoonides kaart</button>
-      <p class="muted">Kasutab Maa- ja Ruumiameti hallkaarti, ligikaudu mõõtkavas 1:80 000 või suurema ala korral punktide ulatust.</p>
+      <p class="muted">Loob Maa- ja Ruumiameti hallkaardist detailse 3200×2000 PNG-pildi. Vaade kohandub punktide ulatusega.</p>
     </form>
     <div class="prompt-box">
       <div class="section-head">
@@ -194,7 +194,7 @@
       "lat" => (float)$cp["lat"],
       "lng" => (float)$cp["lng"],
       "difficulty" => checkpoint_difficulty($cp["difficulty"] ?? 1),
-    ], $checkpoints), JSON_UNESCAPED_UNICODE)) ?>'></div>
+    ], $mapPoints), JSON_UNESCAPED_UNICODE)) ?>'></div>
     <div class="difficulty-legend" aria-label="Punktide raskused">
       <?php foreach ([1, 2, 3, 4, 5, 6] as $difficulty): ?>
         <span><i class="difficulty-icon difficulty-<?= e((string)$difficulty) ?>"></i><?= e(checkpoint_difficulty_label($difficulty)) ?> · <?= e((string)((int)$game['default_visit_points'] + checkpoint_difficulty_bonus($difficulty))) ?> p</span>
@@ -244,8 +244,28 @@
       <button class="button primary">Lisa punkt</button>
     </form>
   </div>
-  <div class="panel">
-    <h2>Punktid</h2>
+  <div class="panel span-two">
+    <div class="section-head">
+      <div>
+        <h2>Punktid</h2>
+        <p class="muted"><?= e((string)$checkpointCount) ?> tulemust · leht <?= e((string)$checkpointPage) ?>/<?= e((string)$checkpointPages) ?></p>
+      </div>
+      <?php if ($selectedCheckpointId): ?><a class="button" href="<?= e(path('/admin/games/' . $game['id'])) ?>#checkpoints">Näita kõiki</a><?php endif; ?>
+    </div>
+    <form class="search-form checkpoint-search" method="get" action="<?= e(path('/admin/games/' . $game['id'])) ?>">
+      <label>Otsi numbri või nime järgi <input name="checkpoint_search" value="<?= e($checkpointSearch) ?>" placeholder="Punkt"></label>
+      <button class="button">Otsi</button>
+      <?php if ($checkpointSearch !== ''): ?><a class="button" href="<?= e(path('/admin/games/' . $game['id'])) ?>#checkpoints">Tühjenda</a><?php endif; ?>
+    </form>
+    <div id="checkpoints" class="pagination" aria-label="Punktide lehed">
+      <?php if ($checkpointPage > 1): ?>
+        <a class="button" href="<?= e(path('/admin/games/' . $game['id']) . '?' . http_build_query(['checkpoint_page' => $checkpointPage - 1, 'checkpoint_search' => $checkpointSearch])) ?>#checkpoints">Eelmine</a>
+      <?php endif; ?>
+      <span>Leht <?= e((string)$checkpointPage) ?>/<?= e((string)$checkpointPages) ?></span>
+      <?php if ($checkpointPage < $checkpointPages): ?>
+        <a class="button" href="<?= e(path('/admin/games/' . $game['id']) . '?' . http_build_query(['checkpoint_page' => $checkpointPage + 1, 'checkpoint_search' => $checkpointSearch])) ?>#checkpoints">Järgmine</a>
+      <?php endif; ?>
+    </div>
     <div class="list">
       <?php foreach ($checkpoints as $cp): ?>
         <?php
@@ -257,7 +277,7 @@
               }
           }
         ?>
-        <form class="checkpoint-edit" method="post" action="<?= e(path('/admin/checkpoints/' . $cp['id'])) ?>" data-checkpoint-form data-checkpoint-id="<?= e((string)$cp['id']) ?>" data-checkpoint-number="<?= e($cp['number']) ?>">
+        <form id="checkpoint-<?= e((string)$cp['id']) ?>" class="checkpoint-edit" method="post" action="<?= e(path('/admin/checkpoints/' . $cp['id'])) ?>" data-checkpoint-form data-checkpoint-id="<?= e((string)$cp['id']) ?>" data-checkpoint-number="<?= e($cp['number']) ?>">
           <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
           <div class="section-head">
             <h3><span class="point-badge"><?= e($cp['number']) ?></span> <?= e($cp['title']) ?></h3>
@@ -311,5 +331,12 @@
         </form>
       <?php endforeach; ?>
     </div>
+    <?php if ($checkpointPages > 1): ?>
+      <div class="pagination" aria-label="Punktide lehed">
+        <?php if ($checkpointPage > 1): ?><a class="button" href="<?= e(path('/admin/games/' . $game['id']) . '?' . http_build_query(['checkpoint_page' => $checkpointPage - 1, 'checkpoint_search' => $checkpointSearch])) ?>#checkpoints">Eelmine</a><?php endif; ?>
+        <span>Leht <?= e((string)$checkpointPage) ?>/<?= e((string)$checkpointPages) ?></span>
+        <?php if ($checkpointPage < $checkpointPages): ?><a class="button" href="<?= e(path('/admin/games/' . $game['id']) . '?' . http_build_query(['checkpoint_page' => $checkpointPage + 1, 'checkpoint_search' => $checkpointSearch])) ?>#checkpoints">Järgmine</a><?php endif; ?>
+      </div>
+    <?php endif; ?>
   </div>
 </section>

@@ -33,8 +33,8 @@
 <section id="tab-questions" class="game-tab">
   <div class="panel">
     <?php
-      $totalQuestions = count($checkpoints);
-      $answeredQuestions = count(array_filter($checkpoints, fn($cp) => !empty($cp['submission_id'])));
+      $totalQuestions = (int)$progress['total_count'];
+      $answeredQuestions = (int)$progress['answered_count'];
     ?>
     <h1>Küsimused</h1>
     <div class="progress-card <?= $totalQuestions > 0 && $answeredQuestions === $totalQuestions ? 'complete' : '' ?>">
@@ -44,16 +44,12 @@
     <div class="gps-warning" data-gps-warning hidden></div>
     <p class="muted" id="gps-status">Asukohta kasutatakse küsimuste sorteerimiseks ja vastamiseks.</p>
     <button class="button" data-refresh-location>Uuenda asukohta</button>
+    <?php if ($questionsLimited): ?>
+      <button class="button" data-refresh-nearest>Leia uuesti lähimad punktid</button>
+      <p class="muted">Kuvatakse kuni 60 lähimat vastamata punkti<?= $hasLocationForQuestions ? ' viimase asukoha järgi' : '. Esimesel korral luba GPS ja vajuta „Leia uuesti lähimad punktid“' ?>.</p>
+    <?php endif; ?>
     <div class="question-list" data-question-list>
       <?php foreach ($checkpoints as $cp): ?>
-        <?php if ($cp['submission_id']): ?>
-          <div class="question-row done">
-            <span class="difficulty-number"><i class="difficulty-icon difficulty-<?= e((string)checkpoint_difficulty($cp['difficulty'] ?? 1)) ?>"></i><b><?= e($cp['number']) ?></b></span>
-            <span><?= e($cp['title']) ?></span>
-            <small>Vastatud</small>
-          </div>
-          <?php continue; ?>
-        <?php endif; ?>
         <form class="question-row" method="post" action="<?= e(path('/answer')) ?>" data-lat="<?= e((string)$cp['lat']) ?>" data-lng="<?= e((string)$cp['lng']) ?>" data-radius="<?= e((string)$cp['radius_m']) ?>">
           <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
           <input type="hidden" name="checkpoint_id" value="<?= e((string)$cp['id']) ?>">

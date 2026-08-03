@@ -34,7 +34,7 @@ function http_request(string $url, ?string $body = null, int $timeout = 60): str
     return $result;
 }
 
-function generated_map_bounds(array $bounds, int $width = 1600, int $height = 1000): array
+function generated_map_bounds(array $bounds, int $width = 3200, int $height = 2000): array
 {
     $centerLat = ($bounds['min_lat'] + $bounds['max_lat']) / 2;
     $centerLng = ($bounds['min_lng'] + $bounds['max_lng']) / 2;
@@ -42,7 +42,7 @@ function generated_map_bounds(array $bounds, int $width = 1600, int $height = 10
     $lngMeters = max(1.0, ($bounds['max_lng'] - $bounds['min_lng']) * 111320 * cos(deg2rad($centerLat)));
 
     // Prefer the game's extent; keep a useful overview for very compact games.
-    $targetWidth = max(12000.0, $lngMeters * 1.18);
+    $targetWidth = max(8000.0, $lngMeters * 1.18);
     $targetHeight = max($targetWidth * $height / $width, $latMeters * 1.18);
     $targetWidth = max($targetWidth, $targetHeight * $width / $height);
 
@@ -87,8 +87,8 @@ function generate_player_map(int $gameId): string
     if (!$bounds) {
         throw new RuntimeException('Mängul ei ole kaardi genereerimiseks punkte.');
     }
-    $width = 1600;
-    $height = 1000;
+    $width = 3200;
+    $height = 2000;
     $mapBounds = generated_map_bounds($bounds, $width, $height);
     $projectedCorners = [
         lest97_xy($mapBounds['min_lat'], $mapBounds['min_lng']),
@@ -113,34 +113,49 @@ function generate_player_map(int $gameId): string
     if (!imageistruecolor($image)) {
         imagepalettetotruecolor($image);
     }
+    imagealphablending($image, true);
 
     $stmt = db()->prepare('SELECT number, lat, lng, difficulty FROM checkpoints WHERE game_id = ? ORDER BY number');
     $stmt->execute([$gameId]);
     $points = $stmt->fetchAll();
     $denseMap = count($points) > 200;
-    $pink = imagecolorallocate($image, 226, 107, 149);
-    $white = imagecolorallocate($image, 255, 255, 255);
-    $dark = imagecolorallocate($image, 37, 37, 37);
+    $pink = imagecolorallocatealpha($image, 226, 107, 149, 72);
+    $white = imagecolorallocatealpha($image, 255, 255, 255, 18);
+    $dark = imagecolorallocatealpha($image, 37, 37, 37, 5);
+    $font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
     foreach ($points as $point) {
         [$pointX, $pointY] = lest97_xy((float)$point['lat'], (float)$point['lng']);
         $x = (int)round(($pointX - $projectedBounds['min_x']) / ($projectedBounds['max_x'] - $projectedBounds['min_x']) * $width);
         $y = (int)round(($projectedBounds['max_y'] - $pointY) / ($projectedBounds['max_y'] - $projectedBounds['min_y']) * $height);
-        draw_map_checkpoint($image, $x, $y, checkpoint_difficulty($point['difficulty'] ?? 1), $pink, $white, $dark, $denseMap ? 5 : 11);
-        if (!$denseMap) imagestring($image, 5, $x + 13, $y - 23, (string)$point['number'], $dark);
+        draw_map_checkpoint($image, $x, $y, checkpoint_difficulty($point['difficulty'] ?? 1), $pink, $white, $dark, $denseMap ? 8 : 20);
+        if (!$denseMap) {
+            if (is_file($font)) {
+                imagettftext($image, 18, 0, $x + 25, $y - 18, $dark, $font, (string)$point['number']);
+            } else {
+                imagestring($image, 5, $x + 23, $y - 25, (string)$point['number'], $dark);
+            }
+        }
     }
-    imagestring($image, 2, 8, $height - 18, 'Maa- ja Ruumiamet | Pimepunkt', $dark);
+    if (is_file($font)) {
+        imagettftext($image, 12, 0, 12, $height - 14, $dark, $font, 'Maa- ja Ruumiamet | Pimepunkt');
+    } else {
+        imagestring($image, 2, 8, $height - 18, 'Maa- ja Ruumiamet | Pimepunkt', $dark);
+    }
 
     $dir = dirname(__DIR__) . '/storage/uploads/maps';
     if (!is_dir($dir) && !mkdir($dir, 0775, true) && !is_dir($dir)) {
         throw new RuntimeException('Kaardikataloogi ei saanud luua.');
     }
     $name = 'game-' . $gameId . '-generated-' . time() . '.png';
-    if (!imagepng($image, $dir . '/' . $name, 6)) {
+    if (!imagepng($image, $dir . '/' . $name, 7)) {
         throw new RuntimeException('Kaardipilti ei saanud salvestada.');
     }
     imagedestroy($image);
     $path = '/uploads/maps/' . $name;
     db()->prepare('UPDATE games SET map_path = ? WHERE id = ?')->execute([$path, $gameId]);
+    foreach (glob($dir . '/game-' . $gameId . '-generated-*.png') ?: [] as $oldMap) {
+        if (basename($oldMap) !== $name) @unlink($oldMap);
+    }
     return $path;
 }
 
@@ -160,7 +175,7 @@ function draw_map_checkpoint(GdImage $image, int $x, int $y, int $difficulty, in
         imagefilledpolygon($image, $points, $fill);
         imagepolygon($image, $points, $line);
     }
-    $center = $radius > 6 ? 5 : 2;
+    $center = $radius > 10 ? 8 : 4;
     imagefilledellipse($image, $x, $y, $center, $center, $white);
     imageellipse($image, $x, $y, $center, $center, $line);
 }

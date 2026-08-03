@@ -40,7 +40,7 @@ A checkpoint-specific visit score overrides the difficulty default. GPX imports 
 
 ## Maps, timing, and road data
 
-- Admin can generate a 1600x1000 player map from the Maa- ja Ruumiamet grayscale WMS. Compact games receive a closer view; larger games fit all checkpoints.
+- Admin can generate a 3200x2000 player map from the Maa- ja Ruumiamet grayscale WMS. Compact games receive a detailed closer view; larger games fit all checkpoints. Checkpoint shapes use a translucent fill and an exact centre dot.
 - GPX export is disabled per game by default and can be enabled in game settings.
 - Timed games use each team's own start time. A paused team may resume only within 100 metres of its pause location.
 - Temporary road restrictions come from the Tarktee ArcGIS REST service.

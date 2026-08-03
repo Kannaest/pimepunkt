@@ -10,7 +10,14 @@ $imported = (int)$pdo->query('SELECT COUNT(DISTINCT game_id) FROM audit_log WHER
 $configured = (int)$pdo->query('SELECT COUNT(DISTINCT g.id) FROM games g JOIN audit_log a ON a.game_id=g.id AND a.action="nagemata_eesti_import" WHERE g.duration_minutes=360 AND g.allow_gpx_export=1 AND g.map_path IS NOT NULL')->fetchColumn();
 $totals = $pdo->query('SELECT g.id,g.name,g.status,g.duration_minutes,g.allow_gpx_export,g.map_path,COUNT(c.id) checkpoints FROM games g LEFT JOIN checkpoints c ON c.game_id=g.id WHERE g.name IN ("Nägemata Eesti Total Kruus","Nägemata Eesti Total Asfalt") GROUP BY g.id ORDER BY g.name')->fetchAll();
 $migration = $pdo->query('SELECT COUNT(*) FROM migrations WHERE name="008_maps_timing_speed.sql"')->fetchColumn();
+$mapPaths = $pdo->query('SELECT DISTINCT g.map_path FROM games g JOIN audit_log a ON a.game_id=g.id WHERE a.action IN ("nagemata_eesti_import","nagemata_eesti_total_created")')->fetchAll(PDO::FETCH_COLUMN);
+$highResolutionMaps = 0;
+foreach ($mapPaths as $mapPath) {
+    $file = dirname(__DIR__) . '/public' . $mapPath;
+    $size = is_file($file) ? getimagesize($file) : false;
+    if ($size && $size[0] === 3200 && $size[1] === 2000) $highResolutionMaps++;
+}
 
-$result = ['migration_008' => (int)$migration === 1, 'imported_games' => $imported, 'configured_imported_games' => $configured, 'totals' => $totals];
+$result = ['migration_008' => (int)$migration === 1, 'imported_games' => $imported, 'configured_imported_games' => $configured, 'high_resolution_maps' => $highResolutionMaps . '/' . count($mapPaths), 'totals' => $totals];
 echo json_encode($result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE) . "\n";
-if ((int)$migration !== 1 || $imported !== $configured || count($totals) !== 2) exit(1);
+if ((int)$migration !== 1 || $imported !== $configured || count($totals) !== 2 || $highResolutionMaps !== count($mapPaths)) exit(1);

@@ -128,7 +128,7 @@
     return r * 2 * Math.atan2(Math.sqrt(x), Math.sqrt(1 - x));
   }
 
-  function updateLocation() {
+  function updateLocation(onComplete) {
     var status = qs('#gps-status');
     var warning = qs('[data-gps-warning]');
     var rows = qsa('.question-row[data-lat]');
@@ -161,10 +161,13 @@
       var list = qs('[data-question-list]');
       rows.sort(function (a, b) { return parseFloat(a.dataset.distance) - parseFloat(b.dataset.distance); })
         .forEach(function (row) { list.appendChild(row); });
-      logLocation(lat, lng, accuracy);
+      logLocation(lat, lng, accuracy).then(function (saved) {
+        if (typeof onComplete === 'function') onComplete(saved);
+      });
     }, function (error) {
       showGpsWarning(gpsErrorMessage(error));
       if (status) status.textContent = 'GPS ei ole lubatud või asukohta ei saanud kätte.';
+      if (typeof onComplete === 'function') onComplete(false);
     }, { enableHighAccuracy: true, timeout: 12000, maximumAge: 10000 });
 
     function showGpsWarning(message) {
@@ -197,12 +200,14 @@
   }
 
   function logLocation(lat, lng, accuracy) {
-    if (!window.PIMEPUNKT) return;
-    fetch(window.PIMEPUNKT.basePath + '/location', {
+    if (!window.PIMEPUNKT) return Promise.resolve(false);
+    return fetch(window.PIMEPUNKT.basePath + '/location', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ lat: lat, lng: lng, accuracy: accuracy })
-    }).catch(function () {});
+    }).then(function (response) {
+      return response.ok;
+    }).catch(function () { return false; });
   }
 
   var refresh = qs('[data-refresh-location]');
@@ -239,6 +244,22 @@
         }
       }, { enableHighAccuracy: true, maximumAge: 15000, timeout: 12000 });
     }
+  }
+
+  var refreshNearest = qs('[data-refresh-nearest]');
+  if (refreshNearest) {
+    refreshNearest.addEventListener('click', function () {
+      refreshNearest.disabled = true;
+      refreshNearest.textContent = 'Leian asukohta...';
+      updateLocation(function (ok) {
+        if (ok) {
+          window.location.reload();
+        } else {
+          refreshNearest.disabled = false;
+          refreshNearest.textContent = 'Leia uuesti lähimad punktid';
+        }
+      });
+    });
   }
 
   var pauseForm = qs('[data-pause-form]');
@@ -293,7 +314,8 @@
     if (!el || !window.L) return;
     var points = JSON.parse(el.dataset.points || '[]');
     var center = points.length ? [points[0].lat, points[0].lng] : [58.75, 25.0];
-    var leaflet = L.map(el).setView(center, points.length ? 13 : 7);
+    var denseMap = points.length > 500;
+    var leaflet = L.map(el, { preferCanvas: denseMap }).setView(center, points.length ? 13 : 7);
     var newForm = qs('[data-new-checkpoint-form]');
     var status = qs('[data-map-edit-status]');
     var selectedForm = newForm;
@@ -363,14 +385,21 @@
       markerLayer.clearLayers();
       markers = {};
       points.forEach(function (p) {
-        var marker = L.marker([p.lat, p.lng], { icon: checkpointIcon(p) })
-          .addTo(markerLayer)
-          .bindPopup(p.number + ' ' + p.title);
+        var popup = document.createElement('span');
+        popup.textContent = p.number + ' ' + p.title;
+        var marker = denseMap
+          ? L.circleMarker([p.lat, p.lng], { radius: 4, color: '#6f3048', weight: 1, fillColor: '#efa1bd', fillOpacity: 0.45 })
+          : L.marker([p.lat, p.lng], { icon: checkpointIcon(p) });
+        marker.addTo(markerLayer).bindPopup(popup);
         markers[String(p.id)] = marker;
         marker.on('click', function () {
           var form = qs('[data-checkpoint-form][data-checkpoint-id="' + p.id + '"]');
-          setSelectedForm(form, false);
-          if (form) form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          if (form) {
+            setSelectedForm(form, false);
+            form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          } else {
+            window.location.href = window.location.pathname + '?checkpoint_id=' + encodeURIComponent(p.id) + '#checkpoint-' + encodeURIComponent(p.id);
+          }
         });
       });
     }

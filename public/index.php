@@ -400,17 +400,49 @@ function admin_game(int $id): void
 {
     require_game_access($id);
     $game = find_game($id);
+    $checkpointPageSize = 50;
+    $checkpointPage = max(1, (int)($_GET['checkpoint_page'] ?? 1));
+    $checkpointSearch = trim((string)($_GET['checkpoint_search'] ?? ''));
+    $selectedCheckpointId = max(0, (int)($_GET['checkpoint_id'] ?? 0));
     $teams = db()->prepare('SELECT * FROM teams WHERE game_id = ? ORDER BY created_at DESC');
     $teams->execute([$id]);
-    $checkpoints = db()->prepare('
+
+    $where = 'c.game_id = ?';
+    $params = [$id];
+    if ($selectedCheckpointId > 0) {
+        $where .= ' AND c.id = ?';
+        $params[] = $selectedCheckpointId;
+        $checkpointPage = 1;
+    } elseif ($checkpointSearch !== '') {
+        $where .= ' AND (c.number LIKE ? OR c.title LIKE ?)';
+        $like = '%' . $checkpointSearch . '%';
+        $params[] = $like;
+        $params[] = $like;
+    }
+    $countStmt = db()->prepare("SELECT COUNT(*) FROM checkpoints c WHERE {$where}");
+    $countStmt->execute($params);
+    $checkpointCount = (int)$countStmt->fetchColumn();
+    $checkpointPages = max(1, (int)ceil($checkpointCount / $checkpointPageSize));
+    $checkpointPage = min($checkpointPage, $checkpointPages);
+
+    $checkpoints = db()->prepare("
         SELECT c.*, q.id AS question_id, q.type AS question_type, q.text AS question_text
         FROM checkpoints c
         LEFT JOIN questions q ON q.checkpoint_id = c.id
-        WHERE c.game_id = ?
-        ORDER BY c.number
-    ');
-    $checkpoints->execute([$id]);
+        WHERE {$where}
+        ORDER BY CAST(c.number AS UNSIGNED), c.number
+        LIMIT ? OFFSET ?
+    ");
+    foreach ($params as $index => $value) {
+        $checkpoints->bindValue($index + 1, $value, is_int($value) ? PDO::PARAM_INT : PDO::PARAM_STR);
+    }
+    $checkpoints->bindValue(count($params) + 1, $checkpointPageSize, PDO::PARAM_INT);
+    $checkpoints->bindValue(count($params) + 2, ($checkpointPage - 1) * $checkpointPageSize, PDO::PARAM_INT);
+    $checkpoints->execute();
     $checkpointRows = $checkpoints->fetchAll();
+    $mapPointsStmt = db()->prepare('SELECT id, number, title, lat, lng, difficulty FROM checkpoints WHERE game_id = ? ORDER BY id');
+    $mapPointsStmt->execute([$id]);
+    $mapPoints = $mapPointsStmt->fetchAll();
     $speedZones = db()->prepare('SELECT * FROM speed_zones WHERE game_id = ? ORDER BY source, name');
     $speedZones->execute([$id]);
     $options = [];
@@ -428,9 +460,15 @@ function admin_game(int $id): void
         'teams' => $teams->fetchAll(),
         'checkpoints' => $checkpointRows,
         'checkpointOptions' => $options,
+        'mapPoints' => $mapPoints,
+        'checkpointCount' => $checkpointCount,
+        'checkpointPage' => $checkpointPage,
+        'checkpointPages' => $checkpointPages,
+        'checkpointSearch' => $checkpointSearch,
+        'selectedCheckpointId' => $selectedCheckpointId,
         'scoreboard' => scoreboard($id),
         'nextNumber' => next_checkpoint_number($id),
-        'mapPrompt' => ai_map_prompt($game, $checkpointRows),
+        'mapPrompt' => ai_map_prompt($game, $mapPoints),
         'gpxPrompt' => gpx_ai_prompt($game),
         'registerLink' => config()['url'] . '/register?game=' . $id,
         'admin' => current_admin(),
@@ -786,7 +824,7 @@ function admin_checkpoint_create(int $gameId): void
         $pdo->rollBack();
         throw $e;
     }
-    redirect_to('/admin/games/' . $gameId);
+    redirect_to('/admin/games/' . $gameId . '?checkpoint_id=' . $checkpointId . '#checkpoint-' . $checkpointId);
 }
 
 function admin_checkpoint_update(int $checkpointId): void
@@ -811,13 +849,13 @@ function admin_checkpoint_update(int $checkpointId): void
     $number = trim((string)($_POST['number'] ?? ''));
     if ($number === '') {
         flash('Punkti number on kohustuslik.');
-        redirect_to('/admin/games/' . $gameId);
+        redirect_to('/admin/games/' . $gameId . '?checkpoint_id=' . $checkpointId . '#checkpoint-' . $checkpointId);
     }
     $duplicate = db()->prepare('SELECT id FROM checkpoints WHERE game_id = ? AND number = ? AND id <> ?');
     $duplicate->execute([$gameId, $number, $checkpointId]);
     if ($duplicate->fetchColumn()) {
         flash('Sellise numbriga punkt on selles mängus juba olemas.');
-        redirect_to('/admin/games/' . $gameId);
+        redirect_to('/admin/games/' . $gameId . '?checkpoint_id=' . $checkpointId . '#checkpoint-' . $checkpointId);
     }
 
     $pdo = db();
@@ -870,7 +908,7 @@ function admin_checkpoint_update(int $checkpointId): void
         $pdo->rollBack();
         throw $e;
     }
-    redirect_to('/admin/games/' . $gameId);
+    redirect_to('/admin/games/' . $gameId . '?checkpoint_id=' . $checkpointId . '#checkpoint-' . $checkpointId);
 }
 
 function admin_checkpoint_delete(int $checkpointId): void
@@ -1089,16 +1127,32 @@ function game_view(): void
         render('game_start', ['team' => $team, 'game' => $game]);
         return;
     }
+    $progressStmt = db()->prepare('SELECT COUNT(*) total_count, COUNT(s.id) answered_count FROM checkpoints c LEFT JOIN submissions s ON s.checkpoint_id=c.id AND s.team_id=? WHERE c.game_id=?');
+    $progressStmt->execute([(int)$team['id'], (int)$team['game_id']]);
+    $progress = $progressStmt->fetch() ?: ['total_count' => 0, 'answered_count' => 0];
+    $latestStmt = db()->prepare('SELECT lat,lng FROM location_logs WHERE team_id=? AND ignored_reason IS NULL ORDER BY id DESC LIMIT 1');
+    $latestStmt->execute([(int)$team['id']]);
+    $latestLocation = $latestStmt->fetch();
+
+    $order = 'CAST(c.number AS UNSIGNED), c.number';
+    $params = [(int)$team['id'], (int)$team['game_id']];
+    if ($latestLocation) {
+        $order = 'POWER(c.lat - ?, 2) + POWER((c.lng - ?) * COS(RADIANS(?)), 2), CAST(c.number AS UNSIGNED), c.number';
+        $params[] = (float)$latestLocation['lat'];
+        $params[] = (float)$latestLocation['lng'];
+        $params[] = (float)$latestLocation['lat'];
+    }
     $stmt = db()->prepare('
         SELECT c.*, q.id AS question_id, q.type AS question_type, q.text AS question_text,
                s.id AS submission_id
         FROM checkpoints c
         JOIN questions q ON q.checkpoint_id = c.id
         LEFT JOIN submissions s ON s.checkpoint_id = c.id AND s.team_id = ?
-        WHERE c.game_id = ?
-        ORDER BY c.number
+        WHERE c.game_id = ? AND s.id IS NULL
+        ORDER BY ' . $order . '
+        LIMIT 60
     ');
-    $stmt->execute([$team['id'], $team['game_id']]);
+    $stmt->execute($params);
     $checkpoints = $stmt->fetchAll();
     $options = [];
     if ($checkpoints) {
@@ -1115,6 +1169,9 @@ function game_view(): void
         'game' => $game,
         'checkpoints' => $checkpoints,
         'options' => $options,
+        'progress' => $progress,
+        'questionsLimited' => ((int)$progress['total_count'] - (int)$progress['answered_count']) > count($checkpoints),
+        'hasLocationForQuestions' => (bool)$latestLocation,
         'deadline' => team_deadline($team, $game),
         'timeExpired' => team_time_expired($team, $game),
     ]);
@@ -1522,19 +1579,24 @@ function ai_map_prompt(array $game, array $checkpoints): string
     $pointLines = [];
     $lats = [];
     $lngs = [];
-    foreach ($checkpoints as $checkpoint) {
+    foreach ($checkpoints as $index => $checkpoint) {
         $lat = (float)$checkpoint['lat'];
         $lng = (float)$checkpoint['lng'];
         $lats[] = $lat;
         $lngs[] = $lng;
-        $pointLines[] = sprintf(
-            '- Punkt %s: %.7F, %.7F, raskus %d (%s)',
-            (string)$checkpoint['number'],
-            $lat,
-            $lng,
-            checkpoint_difficulty($checkpoint['difficulty'] ?? 1),
-            checkpoint_difficulty_label($checkpoint['difficulty'] ?? 1)
-        );
+        if ($index < 200) {
+            $pointLines[] = sprintf(
+                '- Punkt %s: %.7F, %.7F, raskus %d (%s)',
+                (string)$checkpoint['number'],
+                $lat,
+                $lng,
+                checkpoint_difficulty($checkpoint['difficulty'] ?? 1),
+                checkpoint_difficulty_label($checkpoint['difficulty'] ?? 1)
+            );
+        }
+    }
+    if (count($checkpoints) > 200) {
+        $pointLines[] = sprintf('- Ülejäänud %d punkti on prompti mahu tõttu välja jäetud; kasuta täielikuks andmestikuks GPX eksporti.', count($checkpoints) - 200);
     }
 
     $bounds = '';
