@@ -35,8 +35,12 @@ function game_rules(array $game): array
             : (int)$checkpoint['wrong_penalty'];
     }
 
-    $speedStmt = db()->prepare('SELECT COUNT(*) FROM speed_zones WHERE game_id = ?');
-    $speedStmt->execute([(int)$game['id']]);
+    $hasSpeedZones = false;
+    if (config()['speed_tracking_enabled']) {
+        $speedStmt = db()->prepare('SELECT COUNT(*) FROM speed_zones WHERE game_id = ?');
+        $speedStmt->execute([(int)$game['id']]);
+        $hasSpeedZones = (int)$speedStmt->fetchColumn() > 0 && (int)$game['speeding_penalty'] > 0;
+    }
 
     return [
         'checkpoint_count' => count($checkpoints),
@@ -44,7 +48,7 @@ function game_rules(array $game): array
         'visit_max' => $visitPoints ? max($visitPoints) : (int)$game['default_visit_points'],
         'wrong_min' => $wrongPenalties ? min($wrongPenalties) : (int)$game['default_wrong_penalty'],
         'wrong_max' => $wrongPenalties ? max($wrongPenalties) : (int)$game['default_wrong_penalty'],
-        'has_speed_zones' => (int)$speedStmt->fetchColumn() > 0 && (int)$game['speeding_penalty'] > 0,
+        'has_speed_zones' => $hasSpeedZones,
     ];
 }
 
@@ -485,6 +489,12 @@ function speed_zone_at(int $gameId, float $lat, float $lng): ?array
 
 function record_location_and_speed(array $team, float $lat, float $lng, float $accuracy): array
 {
+    if (!config()['speed_tracking_enabled']) {
+        $ignored = $accuracy > 60 ? 'poor_accuracy' : null;
+        db()->prepare('INSERT INTO location_logs (team_id, lat, lng, accuracy_m, ignored_reason) VALUES (?, ?, ?, ?, ?)')
+            ->execute([(int)$team['id'], $lat, $lng, $accuracy, $ignored]);
+        return ['speed' => null, 'limit' => null, 'ignored' => $ignored, 'speeding' => false, 'speeding_seconds' => 0, 'speed_tracking' => false];
+    }
     $lastStmt = db()->prepare('SELECT *, TIMESTAMPDIFF(MICROSECOND, created_at, NOW()) / 1000000 AS elapsed_seconds FROM location_logs WHERE team_id = ? AND ignored_reason IS NULL ORDER BY id DESC LIMIT 1');
     $lastStmt->execute([(int)$team['id']]);
     $last = $lastStmt->fetch();

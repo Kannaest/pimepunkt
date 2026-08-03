@@ -59,10 +59,10 @@
         <b><?= e((string)$answeredQuestions) ?>/<?= e((string)$totalQuestions) ?> tehtud</b>
         <span><?= $totalQuestions > 0 && $answeredQuestions === $totalQuestions ? 'Mäng edukalt läbitud. Aitäh!' : 'Ava lähim sobiv punkt ja vasta siis, kui oled alas.' ?></span>
       </div>
-      <div class="gps-telemetry" aria-live="polite">
-        <div data-speed-state><small>Kiirus</small><b data-current-speed>— km/h</b></div>
+      <div class="gps-telemetry <?= config()['speed_tracking_enabled'] ? '' : 'location-only' ?>" aria-live="polite">
+        <?php if (config()['speed_tracking_enabled']): ?><div data-speed-state><small>Kiirus</small><b data-current-speed>— km/h</b></div><?php endif; ?>
         <div><small>Asukoht</small><b data-location-age>Ootan GPS-i</b></div>
-        <div><small>Piirang</small><b data-speed-limit>—</b><span data-speeding-duration hidden></span></div>
+        <?php if (config()['speed_tracking_enabled']): ?><div><small>Piirang</small><b data-speed-limit>—</b><span data-speeding-duration hidden></span></div><?php endif; ?>
       </div>
       <div class="gps-warning" data-gps-warning hidden></div>
       <div class="location-controls">

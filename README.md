@@ -45,8 +45,8 @@ A checkpoint-specific visit score overrides the difficulty default. GPX imports 
 - GPX export is disabled per game by default and can be enabled in game settings.
 - Timed games use each team's own start time. A paused team may resume only within 100 metres of its pause location.
 - Temporary road restrictions come from the Tarktee ArcGIS REST service.
-- Numeric normal speed limits are synchronized from OpenStreetMap through Overpass. Tarktee numeric variable/increased limits override OSM, and manually configured zones override both.
-- Speed penalties require more than 10 seconds above 110% of a known numeric limit. GPS points with poor accuracy or implausible movement are ignored by the speed calculation.
+- Browser speed tracking is paused by default (`SPEED_TRACKING_ENABLED=false`). Location logs continue without calculating speed, creating speeding events, or applying speed penalties.
+- The existing speed-zone and penalty implementation is retained for possible later use with a native location client. Do not enable it for the browser client.
 
 Public Overpass instances are used only during an admin-triggered synchronization. Players never query Overpass directly. Map and road data require the attribution and licensing terms of their respective providers.
 

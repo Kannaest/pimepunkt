@@ -472,8 +472,12 @@ function admin_game(int $id): void
     $mapPointsStmt = db()->prepare('SELECT id, number, title, lat, lng, difficulty FROM checkpoints WHERE game_id = ? ORDER BY id');
     $mapPointsStmt->execute([$id]);
     $mapPoints = $mapPointsStmt->fetchAll();
-    $speedZones = db()->prepare('SELECT * FROM speed_zones WHERE game_id = ? ORDER BY source, name');
-    $speedZones->execute([$id]);
+    $speedZones = [];
+    if (config()['speed_tracking_enabled']) {
+        $speedZonesStmt = db()->prepare('SELECT * FROM speed_zones WHERE game_id = ? ORDER BY source, name');
+        $speedZonesStmt->execute([$id]);
+        $speedZones = $speedZonesStmt->fetchAll();
+    }
     $options = [];
     $questionIds = array_values(array_filter(array_map(fn($cp) => $cp['question_id'] ?? null, $checkpointRows)));
     if ($questionIds) {
@@ -503,7 +507,7 @@ function admin_game(int $id): void
         'admin' => current_admin(),
         'gameAdmins' => game_admins($id),
         'allAdmins' => db()->query('SELECT * FROM admins ORDER BY email')->fetchAll(),
-        'speedZones' => $speedZones->fetchAll(),
+        'speedZones' => $speedZones,
     ]);
 }
 
@@ -599,6 +603,7 @@ function admin_map_generate(int $id): void
 
 function admin_speed_sync(int $id): void
 {
+    require_speed_tracking_enabled();
     require_game_access($id);
     require_csrf();
     try {
@@ -615,6 +620,7 @@ function admin_speed_sync(int $id): void
 
 function admin_speed_zone_create(int $gameId): void
 {
+    require_speed_tracking_enabled();
     require_game_access($gameId);
     require_csrf();
     $lat = filter_var($_POST['lat'] ?? null, FILTER_VALIDATE_FLOAT);
@@ -634,6 +640,7 @@ function admin_speed_zone_create(int $gameId): void
 
 function admin_speed_zone_delete(int $zoneId): void
 {
+    require_speed_tracking_enabled();
     require_csrf();
     $stmt = db()->prepare('SELECT game_id FROM speed_zones WHERE id = ?');
     $stmt->execute([$zoneId]);
@@ -1006,6 +1013,7 @@ function admin_submission_adjust(int $submissionId): void
 
 function admin_speeding_action(int $eventId, string $action): void
 {
+    require_speed_tracking_enabled();
     require_csrf();
     $stmt = db()->prepare('SELECT t.game_id FROM speeding_events se JOIN teams t ON t.id=se.team_id WHERE se.id=?');
     $stmt->execute([$eventId]);
@@ -1036,14 +1044,18 @@ function admin_live(int $gameId): void
     $submissions->execute([$gameId]);
     $teams = db()->prepare('SELECT id, name, excluded_from_results FROM teams WHERE game_id = ? ORDER BY name');
     $teams->execute([$gameId]);
-    $speeding = db()->prepare('SELECT se.*, t.name team_name, sz.name zone_name FROM speeding_events se JOIN teams t ON t.id=se.team_id LEFT JOIN speed_zones sz ON sz.id=se.speed_zone_id WHERE t.game_id=? ORDER BY se.started_at DESC LIMIT 100');
-    $speeding->execute([$gameId]);
+    $speedingEvents = [];
+    if (config()['speed_tracking_enabled']) {
+        $speeding = db()->prepare('SELECT se.*, t.name team_name, sz.name zone_name FROM speeding_events se JOIN teams t ON t.id=se.team_id LEFT JOIN speed_zones sz ON sz.id=se.speed_zone_id WHERE t.game_id=? ORDER BY se.started_at DESC LIMIT 100');
+        $speeding->execute([$gameId]);
+        $speedingEvents = $speeding->fetchAll();
+    }
     render('admin_live', [
         'game' => $game,
         'scoreboard' => scoreboard($gameId),
         'submissions' => $submissions->fetchAll(),
         'teams' => $teams->fetchAll(),
-        'speedingEvents' => $speeding->fetchAll(),
+        'speedingEvents' => $speedingEvents,
     ]);
 }
 
@@ -1427,10 +1439,14 @@ function game_traffic_json(int $gameId): void
     if ((int)$game['show_traffic_restrictions'] === 1) {
         try { $restrictions = tarktee_restrictions_geojson($gameId); } catch (Throwable $e) { error_log($e); }
     }
-    $zones = db()->prepare('SELECT id, source, name, speed_limit_kmh, geometry_type, center_lat, center_lng, radius_m, geometry_json FROM speed_zones WHERE game_id = ?');
-    $zones->execute([$gameId]);
+    $speedZones = [];
+    if (config()['speed_tracking_enabled']) {
+        $zones = db()->prepare('SELECT id, source, name, speed_limit_kmh, geometry_type, center_lat, center_lng, radius_m, geometry_json FROM speed_zones WHERE game_id = ?');
+        $zones->execute([$gameId]);
+        $speedZones = $zones->fetchAll();
+    }
     header('Content-Type: application/json');
-    echo json_encode(['restrictions' => $restrictions, 'speed_zones' => $zones->fetchAll()], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['restrictions' => $restrictions, 'speed_zones' => $speedZones], JSON_UNESCAPED_UNICODE);
 }
 
 function admin_locations_json(int $gameId): void
@@ -1765,8 +1781,8 @@ function scoreboard(int $gameId): array
                  COALESCE(c.visit_points, ? + CASE c.difficulty WHEN 2 THEN 2 WHEN 3 THEN 4 WHEN 4 THEN 7 WHEN 5 THEN 10 WHEN 6 THEN 13 ELSE 0 END) -
                  CASE WHEN COALESCE(s.admin_correct_override, s.is_correct) = 1 THEN 0 ELSE COALESCE(c.wrong_penalty, ?) END +
                  s.admin_score_adjustment
-               ), 0) - COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS score,
-               COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS speeding_penalty,
+               ), 0) - (? * COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0)) AS score,
+               ? * COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS speeding_penalty,
                CASE WHEN t.play_started_at IS NULL THEN NULL ELSE
                  LEAST(?, GREATEST(0,
                    CAST(TIMESTAMPDIFF(SECOND, t.play_started_at,
@@ -1785,6 +1801,7 @@ function scoreboard(int $gameId): array
         ORDER BY score DESC, correct_count DESC, visited DESC, t.name
     ');
     $maximumSeconds = $game['duration_minutes'] ? (int)$game['duration_minutes'] * 60 : 2147483647;
-    $stmt->execute([(int)$game['default_visit_points'], (int)$game['default_wrong_penalty'], $maximumSeconds, $gameId]);
+    $speedFactor = config()['speed_tracking_enabled'] ? 1 : 0;
+    $stmt->execute([(int)$game['default_visit_points'], (int)$game['default_wrong_penalty'], $speedFactor, $speedFactor, $maximumSeconds, $gameId]);
     return $stmt->fetchAll();
 }

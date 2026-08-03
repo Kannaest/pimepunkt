@@ -30,7 +30,11 @@
     <label>Ajapiirang minutites <input name="duration_minutes" type="number" min="0" value="<?= e((string)($game['duration_minutes'] ?? '')) ?>" placeholder="Piiramata"></label>
     <label>Stardiaken algab <input name="start_window_from" type="datetime-local" value="<?= e($game['start_window_from'] ? date('Y-m-d\TH:i', strtotime($game['start_window_from'])) : '') ?>"></label>
     <label>Stardiaken lõpeb <input name="start_window_to" type="datetime-local" value="<?= e($game['start_window_to'] ? date('Y-m-d\TH:i', strtotime($game['start_window_to'])) : '') ?>"></label>
-    <label>Kiiruseületuse miinus <input name="speeding_penalty" type="number" min="0" value="<?= e((string)($game['speeding_penalty'] ?? 7)) ?>"></label>
+    <?php if (config()['speed_tracking_enabled']): ?>
+      <label>Kiiruseületuse miinus <input name="speeding_penalty" type="number" min="0" value="<?= e((string)($game['speeding_penalty'] ?? 7)) ?>"></label>
+    <?php else: ?>
+      <input name="speeding_penalty" type="hidden" value="<?= e((string)($game['speeding_penalty'] ?? 7)) ?>">
+    <?php endif; ?>
     <label class="checkbox-label"><input name="auto_approve_teams" type="checkbox" value="1" <?= (int)($game['auto_approve_teams'] ?? 0) === 1 ? 'checked' : '' ?>> Kinnita registreerujad automaatselt</label>
     <label class="checkbox-label"><input name="public_results_enabled" type="checkbox" value="1" <?= (int)$game['public_results_enabled'] === 1 ? 'checked' : '' ?>> Tulemused avalikus vaates</label>
     <label class="checkbox-label"><input name="allow_gpx_export" type="checkbox" value="1" <?= (int)($game['allow_gpx_export'] ?? 0) === 1 ? 'checked' : '' ?>> Luba mängijal GPX eksport</label>
@@ -104,6 +108,7 @@
   </div>
 </section>
 
+<?php if (config()['speed_tracking_enabled']): ?>
 <section class="panel">
   <div class="section-head">
     <h2>Kiiruspiirangud</h2>
@@ -134,6 +139,12 @@
     <?php endforeach; ?>
   </div>
 </section>
+<?php else: ?>
+<section class="panel">
+  <h2>Kiirusehaldus</h2>
+  <p class="muted">Brauseriversioonis on kiiruse arvutamine ja karistused pausil. Asukohalogimine jätkub ilma kiiruse hindamiseta.</p>
+</section>
+<?php endif; ?>
 
 <?php $canManageGameAdmins = (int)$admin['is_super'] === 1 || (int)$game['created_by_admin_id'] === (int)$admin['id']; ?>
 <section class="grid two">

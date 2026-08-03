@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 if (PHP_SAPI !== 'cli') exit(1);
+putenv('SPEED_TRACKING_ENABLED=true');
 require __DIR__ . '/../src/bootstrap.php';
 require __DIR__ . '/../src/game_services.php';
 require __DIR__ . '/../src/nutilogi_sync.php';

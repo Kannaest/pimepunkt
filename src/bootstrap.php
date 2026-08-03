@@ -31,6 +31,7 @@ function config(): array
         'base_path' => $basePath,
         'url' => rtrim(env_value('APP_URL', 'http://localhost:8088') ?? '', '/'),
         'secret' => env_value('APP_SECRET', 'dev-secret'),
+        'speed_tracking_enabled' => filter_var(env_value('SPEED_TRACKING_ENABLED', 'false'), FILTER_VALIDATE_BOOL),
         'db' => [
             'host' => env_value('DB_HOST', 'mysql'),
             'port' => env_value('DB_PORT', '3306'),
@@ -110,6 +111,14 @@ function require_csrf(): void
     if (!is_string($token) || !hash_equals(csrf_token(), $token)) {
         http_response_code(419);
         exit('CSRF kontroll ebaõnnestus.');
+    }
+}
+
+function require_speed_tracking_enabled(): void
+{
+    if (!config()['speed_tracking_enabled']) {
+        http_response_code(404);
+        exit('Kiirusehaldus ei ole kasutusel.');
     }
 }
 
