@@ -51,10 +51,15 @@
       var willOpen = main.hidden;
       qsa('.question-row .question-main').forEach(function (item) {
         item.hidden = true;
-        if (item.parentElement) item.parentElement.classList.remove('open');
+        if (item.parentElement) {
+          item.parentElement.classList.remove('open');
+          var itemButton = qs('[data-question-toggle]', item.parentElement);
+          if (itemButton) itemButton.setAttribute('aria-expanded', 'false');
+        }
       });
       main.hidden = !willOpen;
       row.classList.toggle('open', willOpen);
+      button.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
     });
   });
 

@@ -84,11 +84,11 @@
           <input type="hidden" name="lat" data-answer-lat>
           <input type="hidden" name="lng" data-answer-lng>
           <input type="hidden" name="accuracy" data-answer-accuracy>
-          <button class="question-summary" type="button" data-question-toggle>
-            <span><i class="difficulty-icon difficulty-<?= e((string)checkpoint_difficulty($cp['difficulty'] ?? 1)) ?>"></i><b><?= e($cp['number']) ?></b> <?= e($cp['title']) ?></span>
-            <small><?= e(checkpoint_difficulty_label($cp['difficulty'] ?? 1)) ?> · <?= e((string)checkpoint_visit_points($cp, $game)) ?> p · <span data-distance>asukoht teadmata</span> · raadius <?= e((string)$cp['radius_m']) ?> m</small>
+          <button class="question-summary" type="button" data-question-toggle aria-expanded="false" aria-controls="question-main-<?= e((string)$cp['id']) ?>">
+            <span><b><?= e($cp['number']) ?></b><span><?= e($cp['title']) ?></span></span>
           </button>
-          <div class="question-main" hidden>
+          <div class="question-main" id="question-main-<?= e((string)$cp['id']) ?>" hidden>
+            <small class="question-meta"><i class="difficulty-icon difficulty-<?= e((string)checkpoint_difficulty($cp['difficulty'] ?? 1)) ?>"></i><?= e(checkpoint_difficulty_label($cp['difficulty'] ?? 1)) ?> · <?= e((string)checkpoint_visit_points($cp, $game)) ?> p · <span data-distance>asukoht teadmata</span> · raadius <?= e((string)$cp['radius_m']) ?> m</small>
             <p><?= e($cp['question_text']) ?></p>
             <?php if ($cp['question_type'] === 'ok'): ?>
               <input type="hidden" name="ok" value="1">
