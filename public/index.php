@@ -71,7 +71,10 @@ function dispatch(string $method, string $route): void
             db()->prepare('DELETE FROM admin_sessions WHERE token IN (?, ?)')->execute([session_token_hash($token), $token]);
         }
         unset($_SESSION['admin'], $_SESSION['admin_id']);
-        setcookie('pimepunkt_admin', '', ['expires' => time() - 3600, 'path' => (config()['base_path'] ?: '/') . '/']);
+        setcookie('pimepunkt_admin', '', ['expires' => time() - 3600, 'path' => config()['base_path'] ?: '/']);
+        if (config()['base_path'] !== '') {
+            setcookie('pimepunkt_admin', '', ['expires' => time() - 3600, 'path' => config()['base_path'] . '/']);
+        }
         redirect_to('/admin/login');
     }
     if (str_starts_with($route, '/admin')) {
@@ -1389,12 +1392,12 @@ function answer_post(): void
 function location_post(): void
 {
     $team = current_team();
-    if (!$team || $team['status'] !== 'approved' || $team['game_status'] !== 'running' || !$team['play_started_at'] || $team['paused_at']) {
+    if (!$team || $team['status'] !== 'approved' || $team['game_status'] !== 'running' || $team['paused_at']) {
         http_response_code(204);
         return;
     }
     $game = find_game((int)$team['game_id']);
-    if (team_time_expired($team, $game)) {
+    if (($game['duration_minutes'] && !$team['play_started_at']) || team_time_expired($team, $game)) {
         http_response_code(204);
         return;
     }
@@ -1467,7 +1470,13 @@ function admin_locations_json(int $gameId): void
 
 function public_results(int $gameId): void
 {
-    $game = find_game($gameId);
+    try {
+        $game = find_game($gameId);
+    } catch (RuntimeException) {
+        http_response_code(404);
+        render('error', ['message' => 'Mängu ei leitud.']);
+        return;
+    }
     if ($game['status'] !== 'results_public' || (int)$game['public_results_enabled'] !== 1) {
         http_response_code(404);
         render('error', ['message' => 'Tulemused ei ole veel avalikud.']);
@@ -1777,12 +1786,12 @@ function scoreboard(int $gameId): array
                COUNT(s.id) AS visited,
                SUM(CASE WHEN COALESCE(s.admin_correct_override, s.is_correct) = 1 THEN 1 ELSE 0 END) AS correct_count,
                SUM(CASE WHEN s.id IS NOT NULL AND COALESCE(s.admin_correct_override, s.is_correct) = 0 THEN 1 ELSE 0 END) AS wrong_count,
-               COALESCE(SUM(
+               CAST(COALESCE(SUM(
                  COALESCE(c.visit_points, ? + CASE c.difficulty WHEN 2 THEN 2 WHEN 3 THEN 4 WHEN 4 THEN 7 WHEN 5 THEN 10 WHEN 6 THEN 13 ELSE 0 END) -
                  CASE WHEN COALESCE(s.admin_correct_override, s.is_correct) = 1 THEN 0 ELSE COALESCE(c.wrong_penalty, ?) END +
                  s.admin_score_adjustment
-               ), 0) - (? * COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0)) AS score,
-               ? * COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS speeding_penalty,
+               ), 0) - (? * COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0)) AS SIGNED) AS score,
+               CAST(? * COALESCE((SELECT SUM(se.penalty_points) FROM speeding_events se WHERE se.team_id = t.id AND se.status = "confirmed"), 0) AS SIGNED) AS speeding_penalty,
                CASE WHEN t.play_started_at IS NULL THEN NULL ELSE
                  LEAST(?, GREATEST(0,
                    CAST(TIMESTAMPDIFF(SECOND, t.play_started_at,

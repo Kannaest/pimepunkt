@@ -679,6 +679,27 @@
       }).catch(function () {});
   }
 
+  function initAdminLivePolling() {
+    var scoreboard = qs('[data-live-scoreboard]');
+    var submissions = qs('[data-live-submissions]');
+    if (!scoreboard || !submissions) return;
+
+    function refreshLivePanels() {
+      fetch(window.location.href, { headers: { 'X-Pimepunkt-Poll': '1' } })
+        .then(function (response) { return response.ok ? response.text() : Promise.reject(); })
+        .then(function (html) {
+          var parsed = new DOMParser().parseFromString(html, 'text/html');
+          var nextScoreboard = qs('[data-live-scoreboard]', parsed);
+          var nextSubmissions = qs('[data-live-submissions]', parsed);
+          if (nextScoreboard) scoreboard.replaceChildren.apply(scoreboard, Array.from(nextScoreboard.childNodes));
+          if (nextSubmissions) submissions.replaceChildren.apply(submissions, Array.from(nextSubmissions.childNodes));
+        })
+        .catch(function () {});
+    }
+
+    setInterval(refreshLivePanels, 5000);
+  }
+
   function initResultsMap() {
     var el = qs('[data-results-map]');
     if (!el || !window.L) return;
@@ -821,5 +842,6 @@
   initPauseLocationMap();
   initAdminCheckpointMap();
   initAdminLiveMap();
+  initAdminLivePolling();
   initResultsMap();
 })();

@@ -3,7 +3,7 @@
     <h1>Live: <?= e($game['name']) ?></h1>
     <a class="button" href="<?= e(path('/admin/games/' . $game['id'])) ?>">Tagasi</a>
   </div>
-  <div class="score-grid">
+  <div class="score-grid" data-live-scoreboard>
     <?php foreach ($scoreboard as $row): ?>
       <div class="score-card">
         <b><?= e($row['name']) ?></b>
@@ -45,7 +45,7 @@
 </section>
 <section class="panel">
   <h2>Viimased vastused</h2>
-  <div class="list">
+  <div class="list" data-live-submissions>
     <?php foreach ($submissions as $s): ?>
       <form class="submission-row" method="post" action="<?= e(path('/admin/submissions/' . $s['id'] . '/adjust')) ?>">
         <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">

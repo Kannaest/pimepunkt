@@ -88,7 +88,7 @@ function start_session(): void
 
     session_set_cookie_params([
         'lifetime' => 60 * 60 * 24 * 30,
-        'path' => (config()['base_path'] ?: '/') . '/',
+        'path' => config()['base_path'] ?: '/',
         'secure' => $secure,
         'httponly' => true,
         'samesite' => 'Lax',
@@ -309,7 +309,7 @@ function set_admin_cookie(string $token): void
 {
     setcookie('pimepunkt_admin', $token, [
         'expires' => time() + 60 * 60 * 24 * 180,
-        'path' => (config()['base_path'] ?: '/') . '/',
+        'path' => config()['base_path'] ?: '/',
         'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'),
         'httponly' => true,
         'samesite' => 'Lax',
@@ -365,7 +365,7 @@ function set_team_cookie(string $token): void
 {
     setcookie('pimepunkt_team', $token, [
         'expires' => time() + 60 * 60 * 24 * 180,
-        'path' => (config()['base_path'] ?: '/') . '/',
+        'path' => config()['base_path'] ?: '/',
         'secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') || (($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '') === 'https'),
         'httponly' => true,
         'samesite' => 'Lax',
