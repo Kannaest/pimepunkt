@@ -178,8 +178,7 @@ function generate_player_map(int $gameId): string
     $stmt->execute([$gameId]);
     $points = $stmt->fetchAll();
     $denseMap = count($points) > 200;
-    $pink = imagecolorallocatealpha($image, 226, 107, 149, 72);
-    $white = imagecolorallocatealpha($image, 255, 255, 255, 18);
+    $markerRed = imagecolorallocate($image, 210, 47, 47);
     $dark = imagecolorallocatealpha($image, 37, 37, 37, 5);
     $font = '/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf';
     $markerScale = max(1.0, min(1.7, max($width, $height) / 3200));
@@ -189,7 +188,7 @@ function generate_player_map(int $gameId): string
         [$pointX, $pointY] = lest97_xy((float)$point['lat'], (float)$point['lng']);
         $x = (int)round(($pointX - $projectedBounds['min_x']) / ($projectedBounds['max_x'] - $projectedBounds['min_x']) * $width);
         $y = (int)round(($projectedBounds['max_y'] - $pointY) / ($projectedBounds['max_y'] - $projectedBounds['min_y']) * $height);
-        draw_map_checkpoint($image, $x, $y, checkpoint_difficulty($point['difficulty'] ?? 1), $pink, $white, $dark, $markerRadius);
+        draw_map_checkpoint($image, $x, $y, checkpoint_difficulty($point['difficulty'] ?? 1), $markerRed, $markerRadius);
         if (!$denseMap) {
             if (is_file($font)) {
                 imagettftext($image, $fontSize, 0, $x + $markerRadius + 5, $y - $markerRadius + 2, $dark, $font, (string)$point['number']);
@@ -221,12 +220,12 @@ function generate_player_map(int $gameId): string
     return $path;
 }
 
-function draw_map_checkpoint(GdImage $image, int $x, int $y, int $difficulty, int $fill, int $white, int $line, int $radius): void
+function draw_map_checkpoint(GdImage $image, int $x, int $y, int $difficulty, int $red, int $radius): void
 {
     $sides = min(7, $difficulty + 1);
+    imagesetthickness($image, max(3, (int)round($radius * 0.16)));
     if ($difficulty === 1) {
-        imagefilledellipse($image, $x, $y, $radius * 2, $radius * 2, $fill);
-        imageellipse($image, $x, $y, $radius * 2, $radius * 2, $line);
+        imageellipse($image, $x, $y, $radius * 2, $radius * 2, $red);
     } else {
         $points = [];
         for ($i = 0; $i < $sides; $i++) {
@@ -234,12 +233,11 @@ function draw_map_checkpoint(GdImage $image, int $x, int $y, int $difficulty, in
             $points[] = (int)round($x + cos($angle) * $radius);
             $points[] = (int)round($y + sin($angle) * $radius);
         }
-        imagefilledpolygon($image, $points, $fill);
-        imagepolygon($image, $points, $line);
+        imagepolygon($image, $points, $red);
     }
-    $center = $radius > 10 ? 8 : 4;
-    imagefilledellipse($image, $x, $y, $center, $center, $white);
-    imageellipse($image, $x, $y, $center, $center, $line);
+    imagesetthickness($image, 1);
+    $center = max(5, (int)round($radius * 0.35));
+    imagefilledellipse($image, $x, $y, $center, $center, $red);
 }
 
 function game_gpx(int $gameId): string

@@ -326,6 +326,21 @@ textarea { min-height: 92px; resize: vertical; }
   box-sizing: border-box;
   transform: translate(-50%, -50%);
 }
+.checkpoint-marker svg {
+  position: absolute;
+  inset: 0;
+  width: 34px;
+  height: 34px;
+  overflow: visible;
+  fill: none;
+  stroke: #d22f2f;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.checkpoint-marker svg .checkpoint-marker-center {
+  fill: #d22f2f;
+  stroke: none;
+}
 .checkpoint-marker b {
   position: absolute;
   right: -8px;

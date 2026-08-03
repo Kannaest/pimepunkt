@@ -372,13 +372,57 @@
 
     function checkpointIcon(point) {
       var difficulty = Math.max(1, Math.min(6, parseInt(point.difficulty, 10) || 1));
+      var shapes = {
+        1: '<circle cx="18" cy="18" r="11"></circle>',
+        2: '<polygon points="18,5 31,30 5,30"></polygon>',
+        3: '<rect x="7" y="7" width="22" height="22"></rect>',
+        4: '<polygon points="18,4 32,15 27,31 9,31 4,15"></polygon>',
+        5: '<polygon points="9,5 27,5 33,18 27,31 9,31 3,18"></polygon>',
+        6: '<polygon points="18,3 30,9 33,22 25,32 11,32 3,22 6,9"></polygon>'
+      };
+      var number = String(point.number).replace(/[&<>"']/g, function (character) {
+        return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' }[character];
+      });
       return L.divIcon({
-        html: '<span class="checkpoint-marker checkpoint-marker-difficulty-' + difficulty + '"><i></i><b>' + String(point.number) + '</b></span>',
+        html: '<span class="checkpoint-marker checkpoint-marker-difficulty-' + difficulty + '"><svg viewBox="0 0 36 36" aria-hidden="true">' + shapes[difficulty] + '<circle class="checkpoint-marker-center" cx="18" cy="18" r="3.5"></circle></svg><b>' + number + '</b></span>',
         className: 'checkpoint-marker-wrap' + (numbersHidden ? ' numbers-hidden' : ''),
         iconSize: [36, 36],
         iconAnchor: [18, 18],
         popupAnchor: [0, -18]
       });
+    }
+
+    function denseCheckpointMarker(point) {
+      var difficulty = Math.max(1, Math.min(6, parseInt(point.difficulty, 10) || 1));
+      var marker = L.featureGroup();
+      marker.setLatLng = function (latLng) {
+        var center = L.latLng(latLng);
+        var pathOptions = { color: '#d22f2f', weight: 2, opacity: 1, fill: false };
+        marker.clearLayers();
+        if (difficulty === 1) {
+          marker.addLayer(L.circleMarker(center, Object.assign({ radius: 8 }, pathOptions)));
+        } else {
+          var centerPoint = leaflet.latLngToLayerPoint(center);
+          var sides = difficulty + 1;
+          var vertices = [];
+          for (var index = 0; index < sides; index += 1) {
+            var angle = -Math.PI / 2 + index * 2 * Math.PI / sides;
+            vertices.push(leaflet.layerPointToLatLng([
+              centerPoint.x + Math.cos(angle) * 9,
+              centerPoint.y + Math.sin(angle) * 9
+            ]));
+          }
+          marker.addLayer(L.polygon(vertices, pathOptions));
+        }
+        marker.addLayer(L.circleMarker(center, {
+          radius: 3,
+          stroke: false,
+          fillColor: '#d22f2f',
+          fillOpacity: 1
+        }));
+        return marker;
+      };
+      return marker.setLatLng([point.lat, point.lng]);
     }
 
     function drawMarkers() {
@@ -388,7 +432,7 @@
         var popup = document.createElement('span');
         popup.textContent = p.number + ' ' + p.title;
         var marker = denseMap
-          ? L.circleMarker([p.lat, p.lng], { radius: 4, color: '#6f3048', weight: 1, fillColor: '#efa1bd', fillOpacity: 0.45 })
+          ? denseCheckpointMarker(p)
           : L.marker([p.lat, p.lng], { icon: checkpointIcon(p) });
         marker.addTo(markerLayer).bindPopup(popup);
         markers[String(p.id)] = marker;
@@ -411,9 +455,12 @@
     }
 
     setBaseLayer('kaart');
-    drawMarkers();
     if (points.length) {
       leaflet.fitBounds(points.map(function (p) { return [p.lat, p.lng]; }), { padding: [30, 30] });
+    }
+    drawMarkers();
+    if (denseMap) {
+      leaflet.on('zoomend', drawMarkers);
     }
     leaflet.on('click', function (event) {
       setFormLatLng(selectedForm || newForm, event.latlng);
