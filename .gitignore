@@ -12,6 +12,8 @@
 *.log
 *.bak
 *.tmp
+.tmp-nagemata-gpx/
+docs/imports/nagemata-eesti-oiged-vastused.md
 
 .DS_Store
 Thumbs.db
