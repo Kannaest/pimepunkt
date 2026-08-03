@@ -24,7 +24,7 @@
         </form>
       <?php else: ?>
         <a href="<?= e(path('/about')) ?>">Info</a>
-        <a href="<?= e(path('/admin/login')) ?>">Admin</a>
+        <a href="<?= e(path('/admin')) ?>">Admin</a>
       <?php endif; ?>
     </nav>
   </header>

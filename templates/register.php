@@ -21,21 +21,28 @@
   <div class="panel">
     <div class="section-head">
       <h2><?= !empty($selectedGameId) ? 'Valitud mäng' : 'Avatud mängud' ?></h2>
-      <small><?= e((string)count($games)) ?> mängu</small>
+      <?php if (empty($selectedGameId)): ?><small><?= e((string)count($games)) ?> mängu</small><?php endif; ?>
     </div>
     <?php if (!$games): ?>
       <p class="muted"><?= !empty($selectedGameId) ? 'Seda mängu ei leitud või registreerimine ei ole avatud.' : 'Hetkel ei ole registreerimiseks avatud mängu.' ?></p>
     <?php endif; ?>
-    <div class="game-list">
-      <?php foreach ($games as $game): ?>
-        <article class="game-card">
+    <?php if (empty($selectedGameId)): ?>
+      <div class="list game-name-list">
+        <?php foreach ($games as $game): ?>
+          <a class="row game-name-row" href="<?= e(path('/register?game=' . $game['id'])) ?>">
+            <span><?= e($game['name']) ?></span>
+            <span aria-hidden="true">›</span>
+          </a>
+        <?php endforeach; ?>
+      </div>
+    <?php elseif (!empty($selectedGame)): ?>
+      <article class="game-card selected-game-card">
           <div class="game-card-title">
-            <b><?= e($game['name']) ?></b>
-            <small><?= e($game['status']) ?></small>
+            <b><?= e($selectedGame['name']) ?></b>
           </div>
           <form method="post" class="register-form" data-register-form>
             <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
-            <input type="hidden" name="game_id" value="<?= e((string)$game['id']) ?>">
+            <input type="hidden" name="game_id" value="<?= e((string)$selectedGame['id']) ?>">
             <label>Tiimi nimi <input name="team_name" required></label>
             <label>E-mail <input name="email" type="email" required></label>
             <button class="button primary" data-register-submit>Registreeru</button>
@@ -43,9 +50,8 @@
               <?= str_starts_with((string)($flash ?? ''), 'E-mail on saadetud') ? e((string)$flash) : '' ?>
             </p>
           </form>
-        </article>
-      <?php endforeach; ?>
-    </div>
+      </article>
+    <?php endif; ?>
   </div>
 
   <aside class="panel">

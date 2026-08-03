@@ -165,6 +165,22 @@ textarea { min-height: 92px; resize: vertical; }
   grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
   gap: 12px;
 }
+.game-name-list {
+  max-height: min(65vh, 680px);
+  overflow-y: auto;
+  padding-right: 4px;
+}
+.game-name-row {
+  min-height: 52px;
+  color: var(--text);
+  font-weight: 750;
+  text-decoration: none;
+}
+.game-name-row:hover,
+.game-name-row:focus-visible {
+  border-color: var(--blue);
+  background: #f7fafb;
+}
 .game-card {
   display: grid;
   gap: 12px;
@@ -173,6 +189,7 @@ textarea { min-height: 92px; resize: vertical; }
   border-radius: 8px;
   background: #fff;
 }
+.selected-game-card { margin-top: 12px; }
 .game-card-title {
   display: flex;
   justify-content: space-between;

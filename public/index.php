@@ -45,10 +45,16 @@ function dispatch(string $method, string $route): void
         return;
     }
     if ($route === '/admin/login') {
+        if ($method === 'GET' && current_admin()) {
+            redirect_to('/admin');
+        }
         $method === 'POST' ? admin_login_post() : render('admin_login');
         return;
     }
     if ($route === '/admin/register') {
+        if ($method === 'GET' && current_admin()) {
+            redirect_to('/admin');
+        }
         $method === 'POST' ? admin_register_post() : render('admin_register');
         return;
     }
@@ -1037,7 +1043,13 @@ function register_form(): void
     $stmt->execute($params);
     $games = $stmt->fetchAll();
     $played = db()->query("SELECT * FROM games WHERE status = 'results_public' AND public_results_enabled = 1 ORDER BY finished_at DESC, created_at DESC LIMIT 20")->fetchAll();
-    render('register', ['games' => $games, 'playedGames' => $played, 'query' => $q, 'selectedGameId' => $gameId]);
+    render('register', [
+        'games' => $games,
+        'playedGames' => $played,
+        'query' => $q,
+        'selectedGameId' => $gameId,
+        'selectedGame' => $gameId > 0 ? ($games[0] ?? null) : null,
+    ]);
 }
 
 function register_post(): void
