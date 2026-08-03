@@ -40,6 +40,17 @@
           <div class="game-card-title">
             <b><?= e($selectedGame['name']) ?></b>
           </div>
+          <?php if (!empty($overviewBounds)): ?>
+            <div
+              class="registration-area-map"
+              data-registration-area-map
+              data-bounds='<?= e(json_encode([
+                [(float)$overviewBounds['min_lat'], (float)$overviewBounds['min_lng']],
+                [(float)$overviewBounds['max_lat'], (float)$overviewBounds['max_lng']],
+              ], JSON_THROW_ON_ERROR)) ?>'
+              aria-label="Mänguala kaart"
+            ></div>
+          <?php endif; ?>
           <form method="post" class="register-form" data-register-form>
             <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="game_id" value="<?= e((string)$selectedGame['id']) ?>">

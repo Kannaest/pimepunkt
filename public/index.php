@@ -1061,6 +1061,13 @@ function register_form(): void
     $stmt = db()->prepare($sql);
     $stmt->execute($params);
     $games = $stmt->fetchAll();
+    $overviewBounds = null;
+    if ($gameId > 0 && $games) {
+        $bounds = game_bounds($gameId);
+        if ($bounds) {
+            $overviewBounds = generated_map_bounds($bounds, 1, 1);
+        }
+    }
     $played = db()->query("SELECT * FROM games WHERE status = 'results_public' AND public_results_enabled = 1 ORDER BY finished_at DESC, created_at DESC LIMIT 20")->fetchAll();
     render('register', [
         'games' => $games,
@@ -1068,6 +1075,7 @@ function register_form(): void
         'query' => $q,
         'selectedGameId' => $gameId,
         'selectedGame' => $gameId > 0 ? ($games[0] ?? null) : null,
+        'overviewBounds' => $overviewBounds,
     ]);
 }
 

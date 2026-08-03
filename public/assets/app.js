@@ -309,6 +309,25 @@
     });
   }
 
+  function initRegistrationAreaMap() {
+    var el = qs('[data-registration-area-map]');
+    if (!el || !window.L) return;
+    var bounds = JSON.parse(el.dataset.bounds || '[]');
+    if (!Array.isArray(bounds) || bounds.length !== 2) return;
+    var leaflet = L.map(el, { scrollWheelZoom: false, attributionControl: true });
+    maaametLayer('hallkaart').addTo(leaflet);
+    var area = L.latLngBounds(bounds);
+    L.rectangle(area, {
+      color: '#d22f2f',
+      weight: 4,
+      opacity: 1,
+      fillColor: '#d22f2f',
+      fillOpacity: 0.08,
+      interactive: false
+    }).addTo(leaflet);
+    leaflet.fitBounds(area, { padding: [34, 34], maxZoom: 13 });
+  }
+
   function initAdminCheckpointMap() {
     var el = qs('[data-admin-checkpoint-map]');
     if (!el || !window.L) return;
@@ -717,6 +736,7 @@
     if (resetButton) resetButton.addEventListener('click', resetAnimation);
   }
 
+  initRegistrationAreaMap();
   initAdminCheckpointMap();
   initAdminLiveMap();
   initResultsMap();
