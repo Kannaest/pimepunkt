@@ -703,6 +703,16 @@ textarea { min-height: 92px; resize: vertical; }
 .game-clock.expired { border-left-color: #b3261e; }
 .map-export-button { margin-top: 12px; }
 .game-start-panel { margin-inline: auto; }
+.game-rules {
+  margin-block: 20px;
+  padding-block: 18px;
+  border-block: 1px solid var(--line);
+}
+.game-rules h2 { margin: 0 0 12px; font-size: 1.2rem; }
+.game-rules dl { display: grid; gap: 12px; margin: 0; }
+.game-rules dl > div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; }
+.game-rules dt { font-weight: 800; }
+.game-rules dd { margin: 0; line-height: 1.5; }
 
 @media (max-width: 780px) {
   .grid.two, .inline-form, .team-row, .submission-row, .question-row, .question-summary, .stacked-form, .register-layout, .register-form, .search-form, .share-box { grid-template-columns: 1fr; }

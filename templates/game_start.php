@@ -1,7 +1,7 @@
 <section class="panel narrow game-start-panel">
   <h1><?= e($game['name']) ?></h1>
   <?php partial('game_area_map', ['overviewBounds' => $overviewBounds ?? null]); ?>
-  <p>Kui vajutad <b>Alusta mängu</b>, hakkab <?= (int)$game['duration_minutes'] === 360 ? '6 tunni' : e((string)$game['duration_minutes']) . ' minuti' ?> pikkune mänguaeg kohe jooksma.</p>
+  <?php partial('game_rules', ['game' => $game, 'gameRules' => $gameRules ?? null]); ?>
   <?php if ($game['start_window_from'] || $game['start_window_to']): ?>
     <p class="muted">Stardiaken: <?= e((string)($game['start_window_from'] ?: 'kohe')) ?> kuni <?= e((string)($game['start_window_to'] ?: 'avatud')) ?>.</p>
   <?php endif; ?>

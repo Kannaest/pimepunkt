@@ -1070,6 +1070,7 @@ function register_form(): void
         'selectedGameId' => $gameId,
         'selectedGame' => $gameId > 0 ? ($games[0] ?? null) : null,
         'overviewBounds' => $overviewBounds,
+        'gameRules' => $gameId > 0 && $games ? game_rules($games[0]) : null,
     ]);
 }
 
@@ -1161,6 +1162,7 @@ function game_view(): void
             'team' => $team,
             'game' => $game,
             'overviewBounds' => game_overview_bounds((int)$game['id']),
+            'gameRules' => game_rules($game),
         ]);
         return;
     }

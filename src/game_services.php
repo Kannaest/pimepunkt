@@ -19,6 +19,44 @@ function game_overview_bounds(int $gameId): ?array
     return $bounds ? generated_map_bounds($bounds, 1, 1) : null;
 }
 
+function game_rules(array $game): array
+{
+    $stmt = db()->prepare('SELECT difficulty, visit_points, wrong_penalty FROM checkpoints WHERE game_id = ?');
+    $stmt->execute([(int)$game['id']]);
+    $checkpoints = $stmt->fetchAll();
+    $visitPoints = [];
+    $wrongPenalties = [];
+    foreach ($checkpoints as $checkpoint) {
+        $visitPoints[] = $checkpoint['visit_points'] === null
+            ? (int)$game['default_visit_points'] + checkpoint_difficulty_bonus($checkpoint['difficulty'] ?? 1)
+            : (int)$checkpoint['visit_points'];
+        $wrongPenalties[] = $checkpoint['wrong_penalty'] === null
+            ? (int)$game['default_wrong_penalty']
+            : (int)$checkpoint['wrong_penalty'];
+    }
+
+    $speedStmt = db()->prepare('SELECT COUNT(*) FROM speed_zones WHERE game_id = ?');
+    $speedStmt->execute([(int)$game['id']]);
+
+    return [
+        'checkpoint_count' => count($checkpoints),
+        'visit_min' => $visitPoints ? min($visitPoints) : (int)$game['default_visit_points'],
+        'visit_max' => $visitPoints ? max($visitPoints) : (int)$game['default_visit_points'],
+        'wrong_min' => $wrongPenalties ? min($wrongPenalties) : (int)$game['default_wrong_penalty'],
+        'wrong_max' => $wrongPenalties ? max($wrongPenalties) : (int)$game['default_wrong_penalty'],
+        'has_speed_zones' => (int)$speedStmt->fetchColumn() > 0 && (int)$game['speeding_penalty'] > 0,
+    ];
+}
+
+function duration_label(int $minutes): string
+{
+    if ($minutes > 0 && $minutes % 60 === 0) {
+        $hours = intdiv($minutes, 60);
+        return $hours === 1 ? '1 tund' : $hours . ' tundi';
+    }
+    return $minutes . ' minutit';
+}
+
 function http_request(string $url, ?string $body = null, int $timeout = 60): string
 {
     $headers = "User-Agent: Pimepunkt/1.0 (https://kand.ee/pimepunkt)\r\n";

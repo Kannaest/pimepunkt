@@ -41,6 +41,7 @@
             <b><?= e($selectedGame['name']) ?></b>
           </div>
           <?php partial('game_area_map', ['overviewBounds' => $overviewBounds]); ?>
+          <?php partial('game_rules', ['game' => $selectedGame, 'gameRules' => $gameRules ?? null]); ?>
           <form method="post" class="register-form" data-register-form>
             <input type="hidden" name="_csrf" value="<?= e(csrf_token()) ?>">
             <input type="hidden" name="game_id" value="<?= e((string)$selectedGame['id']) ?>">
