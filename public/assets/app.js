@@ -328,6 +328,30 @@
     leaflet.fitBounds(area, { padding: [34, 34], maxZoom: 13 });
   }
 
+  function initPauseLocationMap() {
+    var el = qs('[data-pause-location-map]');
+    if (!el || !window.L) return;
+    var lat = parseFloat(el.dataset.lat);
+    var lng = parseFloat(el.dataset.lng);
+    if (Number.isNaN(lat) || Number.isNaN(lng)) return;
+    var leaflet = L.map(el, { scrollWheelZoom: false }).setView([lat, lng], 16);
+    maaametLayer('hallkaart').addTo(leaflet);
+    L.circle([lat, lng], {
+      radius: 100,
+      color: '#d22f2f',
+      weight: 3,
+      fillColor: '#d22f2f',
+      fillOpacity: 0.09
+    }).addTo(leaflet);
+    L.circleMarker([lat, lng], {
+      radius: 6,
+      color: '#fff',
+      weight: 2,
+      fillColor: '#d22f2f',
+      fillOpacity: 1
+    }).addTo(leaflet).bindTooltip('Pausikoht', { permanent: true, direction: 'top' });
+  }
+
   function initAdminCheckpointMap() {
     var el = qs('[data-admin-checkpoint-map]');
     if (!el || !window.L) return;
@@ -737,6 +761,7 @@
   }
 
   initRegistrationAreaMap();
+  initPauseLocationMap();
   initAdminCheckpointMap();
   initAdminLiveMap();
   initResultsMap();

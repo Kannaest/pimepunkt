@@ -14,6 +14,23 @@
     </form>
   </section>
 <?php endif; ?>
+<?php if (!empty($team['paused_at']) && $team['pause_lat'] !== null && $team['pause_lng'] !== null): ?>
+  <section class="panel pause-location-panel">
+    <div class="section-head">
+      <div>
+        <h2>Mäng on pausil</h2>
+        <p class="muted">Kaart näitab pausikohta ja 100 m ala, kus saad mängu jätkata.</p>
+      </div>
+      <div class="actions">
+        <?php if ((int)($game['allow_gpx_export'] ?? 0) === 1): ?>
+          <a class="button" href="https://www.google.com/maps/dir/?api=1&amp;destination=<?= e(rawurlencode((string)$team['pause_lat'] . ',' . (string)$team['pause_lng'])) ?>&amp;travelmode=driving" target="_blank" rel="noopener noreferrer">Navigeeri Google Mapsis</a>
+          <a class="button" href="<?= e(path('/games/' . $game['id'] . '/checkpoints.gpx')) ?>" download>GPX</a>
+        <?php endif; ?>
+      </div>
+    </div>
+    <div class="leaflet-map pause-location-map" data-pause-location-map data-lat="<?= e((string)$team['pause_lat']) ?>" data-lng="<?= e((string)$team['pause_lng']) ?>"></div>
+  </section>
+<?php endif; ?>
 <?php if ($timeExpired): ?><div class="notice warn">Mänguaeg on lõppenud. Vastuseid enam esitada ei saa.</div><?php endif; ?>
 
 <section id="tab-map" class="game-tab active">

@@ -718,6 +718,10 @@ textarea { min-height: 92px; resize: vertical; }
 .my-game-row > div { display: grid; gap: 3px; min-width: 0; }
 .my-game-row small { color: var(--muted); }
 .my-game-row form { flex: 0 0 auto; }
+.pause-location-panel { margin-bottom: 14px; }
+.pause-location-panel h2 { margin: 0 0 4px; }
+.pause-location-panel p { margin: 0; }
+.pause-location-map { height: 280px; margin-top: 14px; }
 
 @media (max-width: 780px) {
   .grid.two, .inline-form, .team-row, .submission-row, .question-row, .question-summary, .stacked-form, .register-layout, .register-form, .search-form, .share-box { grid-template-columns: 1fr; }

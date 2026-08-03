@@ -136,13 +136,7 @@ function home(): void
 {
     $game = db()->query("SELECT * FROM games WHERE status IN ('registration_open','waiting_start','running','results_public') ORDER BY id DESC LIMIT 1")->fetch();
     $team = current_team();
-    $teamGames = [];
-    if ($team) {
-        $stmt = db()->prepare('SELECT t.*, g.name AS game_name, g.status AS game_status, g.duration_minutes FROM teams t JOIN games g ON g.id=t.game_id WHERE LOWER(t.email)=LOWER(?) AND t.status IN ("pending","approved") AND g.status IN ("registration_open","waiting_start","running") ORDER BY FIELD(g.status,"running","waiting_start","registration_open"), t.updated_at DESC');
-        $stmt->execute([$team['email']]);
-        $teamGames = $stmt->fetchAll();
-    }
-    render('home', ['game' => $game, 'team' => $team, 'teamGames' => $teamGames]);
+    render('home', ['game' => $game, 'team' => $team, 'teamGames' => active_team_games($team)]);
 }
 
 function health(): void
@@ -1073,6 +1067,7 @@ function register_form(): void
     $games = $stmt->fetchAll();
     $overviewBounds = $gameId > 0 && $games ? game_overview_bounds($gameId) : null;
     $played = db()->query("SELECT * FROM games WHERE status = 'results_public' AND public_results_enabled = 1 ORDER BY finished_at DESC, created_at DESC LIMIT 20")->fetchAll();
+    $team = current_team();
     render('register', [
         'games' => $games,
         'playedGames' => $played,
@@ -1081,6 +1076,8 @@ function register_form(): void
         'selectedGame' => $gameId > 0 ? ($games[0] ?? null) : null,
         'overviewBounds' => $overviewBounds,
         'gameRules' => $gameId > 0 && $games ? game_rules($games[0]) : null,
+        'team' => $team,
+        'teamGames' => active_team_games($team),
     ]);
 }
 

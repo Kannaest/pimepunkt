@@ -77,6 +77,16 @@ function team_game_status_label(array $team): string
     return 'Pooleli';
 }
 
+function active_team_games(?array $team): array
+{
+    if (!$team) {
+        return [];
+    }
+    $stmt = db()->prepare('SELECT t.*, g.name AS game_name, g.status AS game_status, g.duration_minutes FROM teams t JOIN games g ON g.id=t.game_id WHERE LOWER(t.email)=LOWER(?) AND t.status IN ("pending","approved") AND g.status IN ("registration_open","waiting_start","running") ORDER BY FIELD(g.status,"running","waiting_start","registration_open"), t.updated_at DESC');
+    $stmt->execute([$team['email']]);
+    return $stmt->fetchAll();
+}
+
 function http_request(string $url, ?string $body = null, int $timeout = 60): string
 {
     $headers = "User-Agent: Pimepunkt/1.0 (https://kand.ee/pimepunkt)\r\n";

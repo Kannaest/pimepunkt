@@ -17,6 +17,8 @@
   <?php endif; ?>
 </section>
 
+<?php partial('my_games', ['team' => $team ?? null, 'teamGames' => $teamGames ?? [], 'showRegisterLink' => false]); ?>
+
 <section class="register-layout">
   <div class="panel">
     <div class="section-head">
