@@ -1,0 +1,2 @@
+ALTER TABLE checkpoints
+  ADD COLUMN difficulty TINYINT UNSIGNED NOT NULL DEFAULT 1 AFTER radius_m;

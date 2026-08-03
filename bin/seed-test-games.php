@@ -24,9 +24,9 @@ try {
     $delete->execute(['Pimepunkt TEST - %']);
 
     $playGameId = create_game($pdo, $playName, 'running', $mapPath, (int)$admin['id']);
-    create_checkpoint_with_question($pdo, $playGameId, '1', 'Testpunkt 1', 58.3859000, 24.4971000, 20000000, 'choice', 'Mis on selle mängu nimi?', ['Pimepunkt', 'Pimeala', 'Punktijaht'], 0);
-    create_checkpoint_with_question($pdo, $playGameId, '2', 'Testpunkt 2', 58.3868000, 24.5000000, 20000000, 'ok', 'Vajuta OK, kui näed seda küsimust.', [], 0);
-    create_checkpoint_with_question($pdo, $playGameId, '3', 'Testpunkt 3', 58.3893000, 24.5034000, 20000000, 'choice', 'Millise saare värvidest disain alguse sai?', ['Hiiumaa', 'Muhu', 'Vormsi'], 1);
+    create_checkpoint_with_question($pdo, $playGameId, '1', 'Testpunkt 1', 58.3859000, 24.4971000, 20000000, 'choice', 'Mis on selle mängu nimi?', ['Pimepunkt', 'Pimeala', 'Punktijaht'], 0, 1);
+    create_checkpoint_with_question($pdo, $playGameId, '2', 'Testpunkt 2', 58.3868000, 24.5000000, 20000000, 'ok', 'Vajuta OK, kui näed seda küsimust.', [], 0, 3);
+    create_checkpoint_with_question($pdo, $playGameId, '3', 'Testpunkt 3', 58.3893000, 24.5034000, 20000000, 'choice', 'Millise saare värvidest disain alguse sai?', ['Hiiumaa', 'Muhu', 'Vormsi'], 1, 6);
 
     $resultsGameId = create_game($pdo, $resultsName, 'results_public', $mapPath, (int)$admin['id']);
     $questions = [];
@@ -75,10 +75,10 @@ function create_game(PDO $pdo, string $name, string $status, string $mapPath, in
     return $gameId;
 }
 
-function create_checkpoint_with_question(PDO $pdo, int $gameId, string $number, string $title, float $lat, float $lng, int $radius, string $type, string $text, array $options, int $correctIndex): array
+function create_checkpoint_with_question(PDO $pdo, int $gameId, string $number, string $title, float $lat, float $lng, int $radius, string $type, string $text, array $options, int $correctIndex, int $difficulty = 1): array
 {
-    $stmt = $pdo->prepare('INSERT INTO checkpoints (game_id, number, title, lat, lng, radius_m) VALUES (?, ?, ?, ?, ?, ?)');
-    $stmt->execute([$gameId, $number, $title, $lat, $lng, $radius]);
+    $stmt = $pdo->prepare('INSERT INTO checkpoints (game_id, number, title, lat, lng, radius_m, difficulty) VALUES (?, ?, ?, ?, ?, ?, ?)');
+    $stmt->execute([$gameId, $number, $title, $lat, $lng, $radius, checkpoint_difficulty($difficulty)]);
     $checkpointId = (int)$pdo->lastInsertId();
 
     $stmt = $pdo->prepare('INSERT INTO questions (checkpoint_id, type, text) VALUES (?, ?, ?)');

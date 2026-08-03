@@ -310,14 +310,14 @@ textarea { min-height: 92px; resize: vertical; }
   line-height: 20px;
   text-align: center;
 }
-.checkpoint-marker-ring i {
+.checkpoint-marker-difficulty-1 i {
   width: 22px;
   height: 22px;
   border: 4px solid var(--pink);
   border-radius: 50%;
   background: rgba(255, 255, 255, .84);
 }
-.checkpoint-marker-ring i::after {
+.checkpoint-marker i::after {
   content: "";
   position: absolute;
   left: 50%;
@@ -328,35 +328,95 @@ textarea { min-height: 92px; resize: vertical; }
   background: var(--text);
   transform: translate(-50%, -50%);
 }
-.checkpoint-marker-pin i {
-  width: 22px;
-  height: 22px;
-  border: 3px solid var(--blue);
-  border-radius: 50% 50% 50% 0;
-  background: var(--white);
-  transform: translate(-50%, -60%) rotate(-45deg);
+.checkpoint-marker-difficulty-2 i,
+.checkpoint-marker-difficulty-3 i,
+.checkpoint-marker-difficulty-4 i,
+.checkpoint-marker-difficulty-5 i,
+.checkpoint-marker-difficulty-6 i {
+  width: 24px;
+  height: 24px;
 }
-.checkpoint-marker-pin i::after {
+.checkpoint-marker-difficulty-2 i {
+  background: var(--yellow);
+  clip-path: polygon(50% 4%, 97% 94%, 3% 94%);
+}
+.checkpoint-marker-difficulty-3 i {
+  border: 3px solid var(--green);
+  background: var(--white);
+}
+.checkpoint-marker-difficulty-4 i {
+  background: var(--orange);
+  clip-path: polygon(50% 2%, 98% 38%, 80% 96%, 20% 96%, 2% 38%);
+}
+.checkpoint-marker-difficulty-5 i {
+  background: var(--blue);
+  clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
+}
+.checkpoint-marker-difficulty-6 i {
+  background: var(--pink);
+  clip-path: polygon(50% 2%, 89% 21%, 99% 61%, 72% 95%, 28% 95%, 1% 61%, 11% 21%);
+}
+.checkpoint-marker-wrap.numbers-hidden b {
+  display: none;
+}
+.difficulty-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 12px;
+  color: var(--muted);
+  font-size: 14px;
+  font-weight: 700;
+}
+.difficulty-legend span,
+.difficulty-number,
+.question-summary > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.difficulty-icon {
+  position: relative;
+  display: inline-block;
+  flex: 0 0 18px;
+  width: 18px;
+  height: 18px;
+}
+.difficulty-icon::after {
   content: "";
   position: absolute;
   left: 50%;
   top: 50%;
-  width: 7px;
-  height: 7px;
+  width: 4px;
+  height: 4px;
   border-radius: 50%;
-  background: var(--blue);
+  background: var(--text);
   transform: translate(-50%, -50%);
 }
-.checkpoint-marker-dot i {
-  width: 18px;
-  height: 18px;
-  border: 3px solid var(--white);
+.difficulty-icon.difficulty-1 {
+  border: 3px solid var(--pink);
   border-radius: 50%;
-  background: var(--green);
-  box-shadow: var(--shadow);
+  background: var(--white);
 }
-.checkpoint-marker-wrap.numbers-hidden b {
-  display: none;
+.difficulty-icon.difficulty-2 {
+  background: var(--yellow);
+  clip-path: polygon(50% 3%, 98% 95%, 2% 95%);
+}
+.difficulty-icon.difficulty-3 {
+  border: 3px solid var(--green);
+  background: var(--white);
+}
+.difficulty-icon.difficulty-4 {
+  background: var(--orange);
+  clip-path: polygon(50% 2%, 98% 38%, 80% 96%, 20% 96%, 2% 38%);
+}
+.difficulty-icon.difficulty-5 {
+  background: var(--blue);
+  clip-path: polygon(25% 4%, 75% 4%, 98% 50%, 75% 96%, 25% 96%, 2% 50%);
+}
+.difficulty-icon.difficulty-6 {
+  background: var(--pink);
+  clip-path: polygon(50% 2%, 89% 21%, 99% 61%, 72% 95%, 28% 95%, 1% 61%, 11% 21%);
 }
 .point-number-label {
   border: 1px solid var(--line);

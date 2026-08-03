@@ -257,7 +257,6 @@
     var markers = {};
     var markerLayer = L.layerGroup().addTo(leaflet);
     var currentBaseLayer = null;
-    var markerStyle = 'ring';
     var numbersHidden = false;
     var rotation = 0;
 
@@ -307,8 +306,9 @@
     }
 
     function checkpointIcon(point) {
+      var difficulty = Math.max(1, Math.min(6, parseInt(point.difficulty, 10) || 1));
       return L.divIcon({
-        html: '<span class="checkpoint-marker checkpoint-marker-' + markerStyle + '"><i></i><b>' + String(point.number) + '</b></span>',
+        html: '<span class="checkpoint-marker checkpoint-marker-difficulty-' + difficulty + '"><i></i><b>' + String(point.number) + '</b></span>',
         className: 'checkpoint-marker-wrap' + (numbersHidden ? ' numbers-hidden' : ''),
         iconSize: [36, 36],
         iconAnchor: [18, 18],
@@ -365,13 +365,6 @@
     if (layerSelect) {
       layerSelect.addEventListener('change', function () {
         setBaseLayer(layerSelect.value);
-      });
-    }
-    var styleSelect = qs('[data-admin-marker-style]');
-    if (styleSelect) {
-      styleSelect.addEventListener('change', function () {
-        markerStyle = styleSelect.value;
-        drawMarkers();
       });
     }
     var hideNumbers = qs('[data-admin-hide-numbers]');

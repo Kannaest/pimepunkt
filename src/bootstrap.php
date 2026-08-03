@@ -148,6 +148,47 @@ function e(string $value): string
     return htmlspecialchars($value, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8');
 }
 
+function checkpoint_difficulty(int|string|null $value): int
+{
+    $difficulty = (int)$value;
+    if ($difficulty <= 1) {
+        return 1;
+    }
+    return min($difficulty, 6);
+}
+
+function checkpoint_difficulty_label(int|string|null $value): string
+{
+    return match (checkpoint_difficulty($value)) {
+        2 => 'Keerukam',
+        3 => 'Keerukas',
+        4 => 'Eriti keerukas',
+        5 => 'Väga keerukas',
+        6 => 'Ekstreemne',
+        default => 'Kerge',
+    };
+}
+
+function checkpoint_difficulty_bonus(int|string|null $value): int
+{
+    return match (checkpoint_difficulty($value)) {
+        2 => 2,
+        3 => 4,
+        4 => 7,
+        5 => 10,
+        6 => 13,
+        default => 0,
+    };
+}
+
+function checkpoint_visit_points(array $checkpoint, array $game): int
+{
+    if ($checkpoint['visit_points'] !== null) {
+        return (int)$checkpoint['visit_points'];
+    }
+    return (int)$game['default_visit_points'] + checkpoint_difficulty_bonus($checkpoint['difficulty'] ?? 1);
+}
+
 function flash(?string $message = null): ?string
 {
     start_session();

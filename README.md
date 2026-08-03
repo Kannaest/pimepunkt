@@ -23,6 +23,21 @@ The container listens on `127.0.0.1:8088`. On your server, configure Apache or a
 Admin and player login use one-time magic links sent by e-mail. With `MAIL_MODE=log`, links are written to `storage/mail/magic-links.log`.
 See `docs/email-setup.md` for SMTP setup examples.
 
+## Checkpoint difficulty
+
+When the game visit-point default is 3, checkpoint difficulty uses these shapes and default scores:
+
+| Difficulty | Shape | Default score |
+|---|---|---:|
+| 1, easy | Circle | 3 |
+| 2, harder | Triangle | 5 |
+| 3, difficult | Square | 7 |
+| 4, especially difficult | Pentagon | 10 |
+| 5, very difficult | Hexagon | 13 |
+| 6, extreme | Heptagon | 16 |
+
+A checkpoint-specific visit score overrides the difficulty default. GPX imports can provide the level as `<extensions><difficulty>1</difficulty></extensions>`.
+
 ## Apache proxy sketch
 
 Run on the server with sudo rights:

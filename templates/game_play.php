@@ -32,7 +32,7 @@
       <?php foreach ($checkpoints as $cp): ?>
         <?php if ($cp['submission_id']): ?>
           <div class="question-row done">
-            <b><?= e($cp['number']) ?></b>
+            <span class="difficulty-number"><i class="difficulty-icon difficulty-<?= e((string)checkpoint_difficulty($cp['difficulty'] ?? 1)) ?>"></i><b><?= e($cp['number']) ?></b></span>
             <span><?= e($cp['title']) ?></span>
             <small>Vastatud</small>
           </div>
@@ -45,8 +45,8 @@
           <input type="hidden" name="lng" data-answer-lng>
           <input type="hidden" name="accuracy" data-answer-accuracy>
           <button class="question-summary" type="button" data-question-toggle>
-            <span><b><?= e($cp['number']) ?></b> <?= e($cp['title']) ?></span>
-            <small><span data-distance>asukoht teadmata</span> · raadius <?= e((string)$cp['radius_m']) ?> m</small>
+            <span><i class="difficulty-icon difficulty-<?= e((string)checkpoint_difficulty($cp['difficulty'] ?? 1)) ?>"></i><b><?= e($cp['number']) ?></b> <?= e($cp['title']) ?></span>
+            <small><?= e(checkpoint_difficulty_label($cp['difficulty'] ?? 1)) ?> · <?= e((string)checkpoint_visit_points($cp, $game)) ?> p · <span data-distance>asukoht teadmata</span> · raadius <?= e((string)$cp['radius_m']) ?> m</small>
           </button>
           <div class="question-main" hidden>
             <p><?= e($cp['question_text']) ?></p>

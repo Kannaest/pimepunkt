@@ -137,6 +137,7 @@ function parse_gpx(string $path, array $answers): array
         $number = xpath_text($waypoint, './*[local-name()="extensions"]/*[local-name()="number"]');
         $question = xpath_text($waypoint, './*[local-name()="extensions"]/*[local-name()="question"]');
         $description = xpath_text($waypoint, './*[local-name()="extensions"]/*[local-name()="longDescription"]');
+        $difficulty = checkpoint_difficulty(xpath_text($waypoint, './*[local-name()="extensions"]/*[local-name()="difficulty"]'));
         $name = xpath_text($waypoint, './*[local-name()="name"]');
         if ($number === '' && preg_match('/^KP\s+([^:]+):/u', $name, $match)) {
             $number = trim($match[1]);
@@ -172,6 +173,7 @@ function parse_gpx(string $path, array $answers): array
             'question' => $description ?: $question ?: ('Punkt ' . $number),
             'lat' => (float)$attributes['lat'],
             'lng' => (float)$attributes['lon'],
+            'difficulty' => $difficulty,
             'options' => $options,
         ];
     }
@@ -266,11 +268,11 @@ foreach ($events as $event) {
         }
         $pdo->prepare('INSERT IGNORE INTO game_admins (game_id, admin_id) VALUES (?, ?)')->execute([$gameId, (int)$admin['id']]);
 
-        $checkpointInsert = $pdo->prepare('INSERT INTO checkpoints (game_id, number, title, lat, lng, radius_m) VALUES (?, ?, ?, ?, ?, 50)');
+        $checkpointInsert = $pdo->prepare('INSERT INTO checkpoints (game_id, number, title, lat, lng, radius_m, difficulty) VALUES (?, ?, ?, ?, ?, 50, ?)');
         $questionInsert = $pdo->prepare('INSERT INTO questions (checkpoint_id, type, text) VALUES (?, ?, ?)');
         $optionInsert = $pdo->prepare('INSERT INTO answer_options (question_id, label, is_correct) VALUES (?, ?, ?)');
         foreach ($event['points'] as $point) {
-            $checkpointInsert->execute([$gameId, $point['number'], $point['title'], $point['lat'], $point['lng']]);
+            $checkpointInsert->execute([$gameId, $point['number'], $point['title'], $point['lat'], $point['lng'], $point['difficulty']]);
             $checkpointId = (int)$pdo->lastInsertId();
             $type = count($point['options']) >= 2 ? 'choice' : 'ok';
             $questionInsert->execute([$checkpointId, $type, $point['question']]);

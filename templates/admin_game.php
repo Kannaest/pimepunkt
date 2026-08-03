@@ -141,13 +141,6 @@
           <option value="hybriid">Hübriid</option>
         </select>
       </label>
-      <label>Ikoon
-        <select data-admin-marker-style>
-          <option value="ring">Ring</option>
-          <option value="pin">Nõel</option>
-          <option value="dot">Täpp</option>
-        </select>
-      </label>
       <label class="checkbox-label"><input type="checkbox" data-admin-hide-numbers> Peida numbrid</label>
       <button class="icon-button" type="button" data-admin-rotate-map>Keera 90°</button>
       <button class="icon-button" type="button" data-admin-large-map>Suur kaart</button>
@@ -158,7 +151,13 @@
       "title" => $cp["title"],
       "lat" => (float)$cp["lat"],
       "lng" => (float)$cp["lng"],
+      "difficulty" => checkpoint_difficulty($cp["difficulty"] ?? 1),
     ], $checkpoints), JSON_UNESCAPED_UNICODE)) ?>'></div>
+    <div class="difficulty-legend" aria-label="Punktide raskused">
+      <?php foreach ([1, 2, 3, 4, 5, 6] as $difficulty): ?>
+        <span><i class="difficulty-icon difficulty-<?= e((string)$difficulty) ?>"></i><?= e(checkpoint_difficulty_label($difficulty)) ?> · <?= e((string)((int)$game['default_visit_points'] + checkpoint_difficulty_bonus($difficulty))) ?> p</span>
+      <?php endforeach; ?>
+    </div>
     <p class="muted" data-map-edit-status>Klõps kaardil täidab uue punkti koordinaadid.</p>
   </div>
   <div class="panel">
@@ -172,7 +171,17 @@
       <label>Nimi <input name="title" required></label>
       <div class="grid two compact"><label>Lat <input name="lat" data-map-lat required></label><label>Lng <input name="lng" data-map-lng required></label></div>
       <label>Raadius meetrites <input name="radius_m" type="number" value="50" required></label>
-      <div class="grid two compact"><label>Punktid <input name="visit_points" type="number" placeholder="default"></label><label>Vale miinus <input name="wrong_penalty" type="number" placeholder="default"></label></div>
+      <label>Raskus
+        <select name="difficulty">
+          <option value="1">Ring · kerge · <?= e((string)$game['default_visit_points']) ?> p</option>
+          <option value="2">Kolmnurk · keerukam · <?= e((string)((int)$game['default_visit_points'] + 2)) ?> p</option>
+          <option value="3">Nelinurk · keerukas · <?= e((string)((int)$game['default_visit_points'] + 4)) ?> p</option>
+          <option value="4">Viisnurk · eriti keerukas · <?= e((string)((int)$game['default_visit_points'] + 7)) ?> p</option>
+          <option value="5">Kuusnurk · väga keerukas · <?= e((string)((int)$game['default_visit_points'] + 10)) ?> p</option>
+          <option value="6">Seitsenurk · ekstreemne · <?= e((string)((int)$game['default_visit_points'] + 13)) ?> p</option>
+        </select>
+      </label>
+      <div class="grid two compact"><label>Punktid <input name="visit_points" type="number" placeholder="<?= e((string)$game['default_visit_points']) ?>"></label><label>Vale miinus <input name="wrong_penalty" type="number" placeholder="default"></label></div>
       <label>Küsimuse tüüp
         <select name="question_type">
           <option value="choice">Valikvastus</option>
@@ -226,9 +235,16 @@
           </div>
           <div class="grid two compact">
             <label>Raadius <input name="radius_m" type="number" value="<?= e((string)$cp['radius_m']) ?>" required></label>
-            <label>Punktid <input name="visit_points" type="number" value="<?= e((string)($cp['visit_points'] ?? '')) ?>" placeholder="default"></label>
+            <label>Raskus
+              <select name="difficulty">
+                <?php foreach ([1 => 'Ring · kerge', 2 => 'Kolmnurk · keerukam', 3 => 'Nelinurk · keerukas', 4 => 'Viisnurk · eriti keerukas', 5 => 'Kuusnurk · väga keerukas', 6 => 'Seitsenurk · ekstreemne'] as $difficulty => $label): ?>
+                  <option value="<?= e((string)$difficulty) ?>" <?= checkpoint_difficulty($cp['difficulty'] ?? 1) === $difficulty ? 'selected' : '' ?>><?= e($label) ?> · <?= e((string)((int)$game['default_visit_points'] + checkpoint_difficulty_bonus($difficulty))) ?> p</option>
+                <?php endforeach; ?>
+              </select>
+            </label>
           </div>
           <div class="grid two compact">
+            <label>Punktid <input name="visit_points" type="number" value="<?= e((string)($cp['visit_points'] ?? '')) ?>" placeholder="<?= e((string)checkpoint_visit_points($cp, $game)) ?>"></label>
             <label>Vale miinus <input name="wrong_penalty" type="number" value="<?= e((string)($cp['wrong_penalty'] ?? '')) ?>" placeholder="default"></label>
             <label>Küsimuse tüüp
               <select name="question_type">

@@ -530,9 +530,10 @@ function admin_gpx_import(int $gameId): void
             }
             $options = gpx_options(gpx_child_text($wpt, 'cmt'));
             $type = count($options) >= 2 ? 'choice' : 'ok';
+            $difficulty = checkpoint_difficulty(gpx_child_text($wpt, 'difficulty'));
 
-            $stmt = $pdo->prepare('INSERT INTO checkpoints (game_id, number, title, lat, lng, radius_m) VALUES (?, ?, ?, ?, ?, 50)');
-            $stmt->execute([$gameId, $number, $title, $lat, $lng]);
+            $stmt = $pdo->prepare('INSERT INTO checkpoints (game_id, number, title, lat, lng, radius_m, difficulty) VALUES (?, ?, ?, ?, ?, 50, ?)');
+            $stmt->execute([$gameId, $number, $title, $lat, $lng, $difficulty]);
             $checkpointId = (int)$pdo->lastInsertId();
             $stmt = $pdo->prepare('INSERT INTO questions (checkpoint_id, type, text) VALUES (?, ?, ?)');
             $stmt->execute([$checkpointId, $type, $questionText]);
@@ -617,7 +618,7 @@ function admin_checkpoint_create(int $gameId): void
     $pdo = db();
     $pdo->beginTransaction();
     try {
-        $stmt = $pdo->prepare('INSERT INTO checkpoints (game_id, number, title, lat, lng, radius_m, visit_points, wrong_penalty) VALUES (?, ?, ?, ?, ?, ?, ?, ?)');
+        $stmt = $pdo->prepare('INSERT INTO checkpoints (game_id, number, title, lat, lng, radius_m, difficulty, visit_points, wrong_penalty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)');
         $stmt->execute([
             $gameId,
             $number,
@@ -625,6 +626,7 @@ function admin_checkpoint_create(int $gameId): void
             (float)$_POST['lat'],
             (float)$_POST['lng'],
             (int)$_POST['radius_m'],
+            checkpoint_difficulty($_POST['difficulty'] ?? 1),
             $_POST['visit_points'] === '' ? null : (int)$_POST['visit_points'],
             $_POST['wrong_penalty'] === '' ? null : (int)$_POST['wrong_penalty'],
         ]);
@@ -690,7 +692,7 @@ function admin_checkpoint_update(int $checkpointId): void
     try {
         $stmt = $pdo->prepare('
             UPDATE checkpoints
-            SET number = ?, title = ?, lat = ?, lng = ?, radius_m = ?, visit_points = ?, wrong_penalty = ?
+            SET number = ?, title = ?, lat = ?, lng = ?, radius_m = ?, difficulty = ?, visit_points = ?, wrong_penalty = ?
             WHERE id = ?
         ');
         $stmt->execute([
@@ -699,6 +701,7 @@ function admin_checkpoint_update(int $checkpointId): void
             (float)($_POST['lat'] ?? 0),
             (float)($_POST['lng'] ?? 0),
             (int)($_POST['radius_m'] ?? 50),
+            checkpoint_difficulty($_POST['difficulty'] ?? 1),
             ($_POST['visit_points'] ?? '') === '' ? null : (int)$_POST['visit_points'],
             ($_POST['wrong_penalty'] ?? '') === '' ? null : (int)$_POST['wrong_penalty'],
             $checkpointId,
@@ -1266,10 +1269,12 @@ function ai_map_prompt(array $game, array $checkpoints): string
         $lats[] = $lat;
         $lngs[] = $lng;
         $pointLines[] = sprintf(
-            '- Punkt %s: %.7F, %.7F',
+            '- Punkt %s: %.7F, %.7F, raskus %d (%s)',
             (string)$checkpoint['number'],
             $lat,
-            $lng
+            $lng,
+            checkpoint_difficulty($checkpoint['difficulty'] ?? 1),
+            checkpoint_difficulty_label($checkpoint['difficulty'] ?? 1)
         );
     }
 
@@ -1301,7 +1306,7 @@ function ai_map_prompt(array $game, array $checkpoints): string
         "- Skandinaavialikult lihtne, hele ja puhas kujundus.\n" .
         "- Kasuta pastelseid Muhu värve aktsentidena: roosa, oranž, kollane, salveiroheline ja suitsusinine.\n" .
         "- Kaart võib olla veidi lihtsustatud ja 90 kraadi pööratud, aga aluskaardi geomeetria peab jääma äratuntavaks.\n" .
-        "- Märgi iga kontrollpunkt selge ringi või nõelaga ja kirjuta juurde ainult punkti number.\n" .
+        "- Märgi raskus 1 ringi, raskus 2 kolmnurga, raskus 3 nelinurga, raskus 4 viisnurga, raskus 5 kuusnurga ja raskus 6 seitsenurgaga; kujundi keskel olgu punkt ning juures ainult punkti number.\n" .
         "- Väldi liigset dekoratsiooni; kaart peab olema mängijale päriselt navigeeritav.\n" .
         "- Väljund horisontaalne 16:9 või A4 landscape, kõrge resolutsioon, JPG/PNG."
     );
@@ -1317,6 +1322,7 @@ function gpx_ai_prompt(array $game): string
         "- <name> sisaldab punkti numbrit, näiteks 1.\n" .
         "- <type> sisaldab punkti või küsimuse nime, näiteks Vana kaev.\n" .
         "- <desc> sisaldab küsimuse teksti.\n" .
+        "- <extensions><difficulty>1</difficulty></extensions> sisaldab raskust 1 kuni 6: 1 kerge tee ääres, 2 keerukam metsateel, 3 keerukas kehvemal metsateel, 4 eriti keerukas ja võib olla mudane, 5 väga keerukas, 6 ekstreemne.\n" .
         "- <cmt> sisaldab valikvastuseid kujul \"*õige vastus|vale vastus|vale vastus\". Kui küsimus on ainult kohaloleku kinnitamine, jäta <cmt> tühjaks.\n\n" .
         "Tee 2 kuni 5 vastusevarianti. Märgi täpselt üks õige vastus tärniga. Ära lisa marsruute ega träkke."
     );
@@ -1336,12 +1342,14 @@ function sample_gpx(string $gameName): string
     <type>Vana kaev</type>
     <desc>Mis värvi on punkti juures olev märk?</desc>
     <cmt>*sinine|punane|kollane</cmt>
+    <extensions><difficulty>1</difficulty></extensions>
   </wpt>
   <wpt lat="58.6388489" lon="23.1692863">
     <name>2</name>
     <type>Teine kontrollpunkt</type>
     <desc>Kinnita kohalolek teises punktis.</desc>
     <cmt></cmt>
+    <extensions><difficulty>3</difficulty></extensions>
   </wpt>
 </gpx>
 GPX;
@@ -1356,7 +1364,7 @@ function scoreboard(int $gameId): array
                SUM(CASE WHEN COALESCE(s.admin_correct_override, s.is_correct) = 1 THEN 1 ELSE 0 END) AS correct_count,
                SUM(CASE WHEN s.id IS NOT NULL AND COALESCE(s.admin_correct_override, s.is_correct) = 0 THEN 1 ELSE 0 END) AS wrong_count,
                COALESCE(SUM(
-                 COALESCE(c.visit_points, ?) -
+                 COALESCE(c.visit_points, ? + CASE c.difficulty WHEN 2 THEN 2 WHEN 3 THEN 4 WHEN 4 THEN 7 WHEN 5 THEN 10 WHEN 6 THEN 13 ELSE 0 END) -
                  CASE WHEN COALESCE(s.admin_correct_override, s.is_correct) = 1 THEN 0 ELSE COALESCE(c.wrong_penalty, ?) END +
                  s.admin_score_adjustment
                ), 0) AS score
