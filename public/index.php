@@ -95,6 +95,10 @@ function dispatch(string $method, string $route): void
         game_start_post();
         return;
     }
+    if ($route === '/game/select' && $method === 'POST') {
+        game_select_post();
+        return;
+    }
     if ($route === '/game/pause' && $method === 'POST') {
         game_pause_post(false);
         return;
@@ -132,7 +136,13 @@ function home(): void
 {
     $game = db()->query("SELECT * FROM games WHERE status IN ('registration_open','waiting_start','running','results_public') ORDER BY id DESC LIMIT 1")->fetch();
     $team = current_team();
-    render('home', ['game' => $game, 'team' => $team]);
+    $teamGames = [];
+    if ($team) {
+        $stmt = db()->prepare('SELECT t.*, g.name AS game_name, g.status AS game_status, g.duration_minutes FROM teams t JOIN games g ON g.id=t.game_id WHERE LOWER(t.email)=LOWER(?) AND t.status IN ("pending","approved") AND g.status IN ("registration_open","waiting_start","running") ORDER BY FIELD(g.status,"running","waiting_start","registration_open"), t.updated_at DESC');
+        $stmt->execute([$team['email']]);
+        $teamGames = $stmt->fetchAll();
+    }
+    render('home', ['game' => $game, 'team' => $team, 'teamGames' => $teamGames]);
 }
 
 function health(): void
@@ -1233,6 +1243,24 @@ function game_start_post(): void
     }
     db()->prepare('UPDATE teams SET play_started_at = COALESCE(play_started_at, NOW()) WHERE id = ?')->execute([(int)$team['id']]);
     audit('team_game_started', (int)$team['game_id'], (int)$team['id']);
+    redirect_to('/game');
+}
+
+function game_select_post(): void
+{
+    require_csrf();
+    $current = current_team();
+    if (!$current) {
+        redirect_to('/register');
+    }
+    $stmt = db()->prepare('SELECT t.id FROM teams t JOIN games g ON g.id=t.game_id WHERE t.id=? AND LOWER(t.email)=LOWER(?) AND t.status IN ("pending","approved") AND g.status IN ("registration_open","waiting_start","running")');
+    $stmt->execute([(int)($_POST['team_id'] ?? 0), $current['email']]);
+    $teamId = (int)$stmt->fetchColumn();
+    if ($teamId < 1) {
+        http_response_code(403);
+        exit('Seda mängu ei saa avada.');
+    }
+    create_team_session($teamId);
     redirect_to('/game');
 }
 

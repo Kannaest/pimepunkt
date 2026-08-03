@@ -57,6 +57,26 @@ function duration_label(int $minutes): string
     return $minutes . ' minutit';
 }
 
+function team_game_status_label(array $team): string
+{
+    if ($team['status'] === 'pending') {
+        return 'Ootab korraldaja kinnitust';
+    }
+    if ($team['game_status'] !== 'running') {
+        return 'Registreeritud, ootab mängu starti';
+    }
+    if (!empty($team['duration_minutes']) && empty($team['play_started_at'])) {
+        return 'Valmis alustamiseks';
+    }
+    if (!empty($team['paused_at'])) {
+        return 'Pausil';
+    }
+    if (team_time_expired($team, $team)) {
+        return 'Mänguaeg on lõppenud';
+    }
+    return 'Pooleli';
+}
+
 function http_request(string $url, ?string $body = null, int $timeout = 60): string
 {
     $headers = "User-Agent: Pimepunkt/1.0 (https://kand.ee/pimepunkt)\r\n";

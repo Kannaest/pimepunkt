@@ -713,6 +713,11 @@ textarea { min-height: 92px; resize: vertical; }
 .game-rules dl > div { display: grid; grid-template-columns: 88px minmax(0, 1fr); gap: 12px; }
 .game-rules dt { font-weight: 800; }
 .game-rules dd { margin: 0; line-height: 1.5; }
+.my-games-panel { margin-bottom: 20px; }
+.my-games-panel h1 { margin: 0; font-size: 1.5rem; }
+.my-game-row > div { display: grid; gap: 3px; min-width: 0; }
+.my-game-row small { color: var(--muted); }
+.my-game-row form { flex: 0 0 auto; }
 
 @media (max-width: 780px) {
   .grid.two, .inline-form, .team-row, .submission-row, .question-row, .question-summary, .stacked-form, .register-layout, .register-form, .search-form, .share-box { grid-template-columns: 1fr; }
